@@ -1,264 +1,120 @@
-import { Role, type User, type Folder, type ImageFile } from '../types';
+import type { User, Folder, ImageFile } from '../types';
 
-// --- Mock Database ---
+const API_BASE_URL = '/api';
 
-const DB_KEY = 'greenecom_cdn_db';
+// --- Helper Functions ---
+const getToken = () => localStorage.getItem('accessToken');
 
-interface Database {
-  users: User[];
-  folders: Folder[];
-  images: Record<string, ImageFile[]>; // folderId -> images
-}
-
-const getInitialData = (): Database => {
-  const adminId = 'user-1';
-  const memberId = 'user-2';
-
-  const folder1Id = 'folder-1';
-  const folder2Id = 'folder-2';
-
-  return {
-    users: [
-      { id: adminId, username: 'admin', role: Role.ADMIN }, // password: Rinnguyen@123
-      { id: memberId, username: 'member', role: Role.MEMBER }, // password: member
-    ],
-    folders: [
-      { id: folder1Id, name: 'Marketing Materials', assignedUserIds: [memberId] },
-      { id: folder2Id, name: 'Product Shots', assignedUserIds: [] },
-    ],
-    images: {
-      [folder1Id]: [
-        { id: 'img-1', name: 'banner.jpg', url: 'https://cdn.greenecom.net/marketing-materials/banner.jpg', displayUrl: 'https://picsum.photos/seed/picsum/400/300', uploadedAt: new Date() },
-        { id: 'img-2', name: 'logo.png', url: 'https://cdn.greenecom.net/marketing-materials/logo.png', displayUrl: 'https://picsum.photos/seed/rdm/400/300', uploadedAt: new Date() },
-      ],
-      [folder2Id]: [],
-    },
+const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
+  const headers: HeadersInit = {
+    ...options.headers,
   };
-};
-
-let db: Database;
-
-const loadDb = () => {
-  try {
-    const storedDb = localStorage.getItem(DB_KEY);
-    if (storedDb) {
-      db = JSON.parse(storedDb);
-      // Revive dates and ensure displayUrl exists for older data
-      Object.values(db.images).flat().forEach(img => {
-        if (img.uploadedAt) {
-            img.uploadedAt = new Date(img.uploadedAt);
-        }
-        if (!img.displayUrl) {
-            img.displayUrl = img.url;
-        }
-      });
-    } else {
-      db = getInitialData();
-      saveDb();
-    }
-  } catch (error) {
-    console.error("Failed to load DB from localStorage", error);
-    db = getInitialData();
+  const token = getToken();
+  if (token && !(options.body instanceof FormData)) {
+      headers['Authorization'] = `Bearer ${token}`;
   }
-};
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
-const saveDb = () => {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
-};
-
-loadDb();
-
-// --- API Functions ---
-
-// Helper to simulate network delay
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-const fileToDataUrl = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+  const response = await fetch(`${API_BASE_URL}${url}`, {
+    ...options,
+    headers,
   });
+
+  if (!response.ok) {
+    let errorMsg = `HTTP error! status: ${response.status}`;
+    try {
+        const errorData = await response.json();
+        errorMsg = errorData.error || errorData.message || errorMsg;
+    } catch (e) { /* Ignore parsing error */ }
+    throw new Error(errorMsg);
+  }
+  
+  if (response.status === 204) { // No Content
+      return null as T;
+  }
+
+  return response.json();
 };
 
 const slugify = (text: string) => {
     return text.toString().toLowerCase()
-        .replace(/\s+/g, '-')           // Replace spaces with -
-        .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
-        .replace(/\-\-+/g, '-')         // Replace multiple - with single -
-        .replace(/^-+/, '')             // Trim - from start of text
-        .replace(/-+$/, '');            // Trim - from end of text
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
 }
 
-
+// --- API Functions ---
 export const api = {
   async login(username: string, password: string): Promise<User> {
-    await delay(500);
-    const user = db.users.find(u => u.username === username);
-    if (user) {
-        // Special password for admin, simple check for others
-        if (user.role === Role.ADMIN && password === 'Rinnguyen@123') {
-            return user;
-        }
-        if (user.role === Role.MEMBER && password === user.username) {
-            return user;
-        }
-    }
-    throw new Error('Invalid credentials');
-  },
-
-  async getAllUsers(): Promise<User[]> {
-    await delay(300);
-    return [...db.users];
-  },
-
-  async getAllFolders(): Promise<Folder[]> {
-    await delay(300);
-    return [...db.folders];
-  },
-  
-  async getFoldersForUser(userId: string): Promise<Folder[]> {
-    await delay(300);
-    return db.folders.filter(f => f.assignedUserIds.includes(userId));
-  },
-
-  async getImagesInFolder(folderId: string): Promise<ImageFile[]> {
-    await delay(400);
-    // Return a shallow copy to ensure React detects state changes
-    return [...(db.images[folderId] || [])];
-  },
-
-  async uploadImage(data: File | string, folderId: string): Promise<void> {
-    await delay(1000);
-    const folder = db.folders.find(f => f.id === folderId);
-    if (!folder) {
-      throw new Error('Folder not found');
-    }
-    
-    let displayUrl: string;
-    let name: string;
-
-    if (typeof data === 'string') {
-      displayUrl = data;
-      try {
-        const urlPath = new URL(data).pathname;
-        name = urlPath.substring(urlPath.lastIndexOf('/') + 1) || 'image.jpg';
-      } catch (e) {
-        name = 'image_from_url.jpg';
-      }
-    } else {
-      displayUrl = await fileToDataUrl(data);
-      name = data.name;
-    }
-
-    const folderSlug = slugify(folder.name);
-    const cdnUrl = `https://cdn.greenecom.net/${folderSlug}/${name}`;
-
-    const newImage: ImageFile = {
-      id: `img-${Date.now()}`,
-      name,
-      url: cdnUrl,
-      displayUrl,
-      uploadedAt: new Date(),
-    };
-
-    if (!db.images[folderId]) {
-      db.images[folderId] = [];
-    }
-    db.images[folderId].unshift(newImage); // Add to the beginning
-    saveDb();
-  },
-
-  async createUser(username: string, password: string): Promise<User> {
-    await delay(500);
-    if (db.users.some(u => u.username === username)) {
-      throw new Error('Username already exists');
-    }
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      username,
-      role: Role.MEMBER, // Only members can be created via UI
-    };
-    db.users.push(newUser);
-    saveDb();
-    // NOTE: Password isn't stored in this mock. A real backend would handle it.
-    return newUser;
-  },
-
-  async createFolder(name: string): Promise<Folder> {
-      await delay(500);
-      if (db.folders.some(f => f.name === name)) {
-          throw new Error('Folder name already exists');
-      }
-      const newFolder: Folder = {
-          id: `folder-${Date.now()}`,
-          name,
-          assignedUserIds: [],
-      };
-      db.folders.push(newFolder);
-      db.images[newFolder.id] = [];
-      saveDb();
-      return newFolder;
-  },
-
-  async assignUserToFolder(userId: string, folderId: string): Promise<void> {
-      await delay(500);
-      const folder = db.folders.find(f => f.id === folderId);
-      const user = db.users.find(u => u.id === userId);
-
-      if (!folder || !user) {
-          throw new Error('User or folder not found');
-      }
-
-      if (!folder.assignedUserIds.includes(userId)) {
-          folder.assignedUserIds.push(userId);
-          saveDb();
-      }
-  },
-
-  async deleteImage(imageId: string, folderId: string): Promise<void> {
-    await delay(500);
-    if (!db.images[folderId]) {
-      throw new Error('Folder not found');
-    }
-    
-    db.images[folderId] = db.images[folderId].filter(img => img.id !== imageId);
-    saveDb();
-  },
-
-  async deleteUser(userId: string): Promise<void> {
-    await delay(500);
-    const userIndex = db.users.findIndex(u => u.id === userId);
-    if (userIndex === -1) {
-      throw new Error('User not found');
-    }
-    if (db.users[userIndex].role === Role.ADMIN) {
-        throw new Error('Cannot delete the administrator account.');
-    }
-
-    db.users.splice(userIndex, 1);
-
-    // Unassign this user from all folders
-    db.folders.forEach(folder => {
-        const assignmentIndex = folder.assignedUserIds.indexOf(userId);
-        if (assignmentIndex > -1) {
-            folder.assignedUserIds.splice(assignmentIndex, 1);
-        }
+    const response = await fetch(`${API_BASE_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
     });
-
-    saveDb();
+    if (!response.ok) throw new Error('Invalid credentials');
+    const data = await response.json();
+    localStorage.setItem('accessToken', data.accessToken);
+    return data.user;
   },
 
-  async deleteFolder(folderId: string): Promise<void> {
-    await delay(500);
-    const folderIndex = db.folders.findIndex(f => f.id === folderId);
-    if (folderIndex === -1) {
-        throw new Error('Folder not found');
+  getAllUsers: () => request<User[]>('/users'),
+  getAllFolders: () => request<Folder[]>('/folders'),
+  getFoldersForUser: (userId: string) => request<Folder[]>(`/users/${userId}/folders`),
+  getImagesInFolder: (folderId: string) => request<ImageFile[]>(`/folders/${folderId}/images`),
+
+  async uploadImage(file: File, folderId: string, folderName: string): Promise<void> {
+    const folderSlug = slugify(folderName);
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('folderId', folderId);
+    formData.append('folderSlug', folderSlug);
+    
+    // Custom fetch for FormData
+    const token = getToken();
+    const headers: HeadersInit = {};
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
     }
 
-    db.folders.splice(folderIndex, 1);
-    delete db.images[folderId];
-    saveDb();
+    const response = await fetch(`${API_BASE_URL}/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+    });
+     if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+    }
   },
+
+  createUser: (username: string, password: string) => request<User>('/users', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  }),
+
+  createFolder: (name: string) => request<Folder>('/folders', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  }),
+
+  assignUserToFolder: (userId: string, folderId: string) => request<void>('/folders/assign', {
+    method: 'POST',
+    body: JSON.stringify({ userId, folderId }),
+  }),
+  
+  deleteImage: (imageId: string) => request<void>(`/images/${imageId}`, {
+    method: 'DELETE',
+  }),
+
+  deleteUser: (userId: string) => request<void>(`/users/${userId}`, {
+    method: 'DELETE',
+  }),
+
+  deleteFolder: (folderId: string) => request<void>(`/folders/${folderId}`, {
+    method: 'DELETE',
+  }),
 };

@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import type { User } from '../types';
 import { api } from '../services/api';
@@ -17,30 +16,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    setLoading(true);
+    try {
+        const storedUser = localStorage.getItem('user');
+        const token = localStorage.getItem('accessToken');
+        if (storedUser && token) {
+          setUser(JSON.parse(storedUser));
+        }
+    } catch(e) {
+        // Corrupted user data, clear it
+        localStorage.clear();
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (username: string, password: string) => {
-    setLoading(true);
-    try {
-      const loggedInUser = await api.login(username, password);
-      setUser(loggedInUser);
-      localStorage.setItem('user', JSON.stringify(loggedInUser));
-    } catch (error) {
-      console.error(error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
+    const loggedInUser = await api.login(username, password);
+    setUser(loggedInUser);
+    localStorage.setItem('user', JSON.stringify(loggedInUser));
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
   };
 
   return (

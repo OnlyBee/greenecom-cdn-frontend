@@ -39,20 +39,18 @@ const Dashboard: React.FC = () => {
       }
       setFolders(availableFolders);
 
-      // Post-fetch logic for selecting a folder
       const selectedFolderStillExists = selectedFolder && availableFolders.some(f => f.id === selectedFolder);
       
       if (!selectedFolderStillExists) {
           if (availableFolders.length > 0) {
               setSelectedFolder(availableFolders[0].id);
           } else {
-              setSelectedFolder(null); // No folders available
+              setSelectedFolder(null);
           }
       }
-      // If selected folder still exists, we don't need to do anything.
 
-    } catch (e) {
-      setError('Failed to fetch data.');
+    } catch (e: any) {
+      setError(e.message || 'Failed to fetch data.');
     } finally {
       setIsLoading(false);
     }
@@ -66,25 +64,22 @@ const Dashboard: React.FC = () => {
     try {
         const folderImages = await api.getImagesInFolder(selectedFolder);
         setImages(folderImages);
-    } catch (e) {
-        setError('Failed to fetch images.');
+    } catch (e: any) {
+        setError(e.message || 'Failed to fetch images.');
         setImages([]);
     }
   };
 
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
     if (selectedFolder) {
       fetchImages();
     } else {
-      // Clear images if no folder is selected
       setImages([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFolder]);
 
   const handleUploadSuccess = () => {
@@ -96,11 +91,9 @@ const Dashboard: React.FC = () => {
   }
 
   const handleDeleteImage = async (imageId: string) => {
-    if (!selectedFolder) return;
-
     try {
-        await api.deleteImage(imageId, selectedFolder);
-        fetchImages(); // Refetch images to update the UI
+        await api.deleteImage(imageId);
+        fetchImages();
     } catch (e) {
         console.error("Failed to delete image:", e);
         alert('An error occurred while deleting the image.');
@@ -119,7 +112,6 @@ const Dashboard: React.FC = () => {
           )}
 
           <div className="mt-8 grid grid-cols-1 md:grid-cols-12 gap-8">
-            {/* Folder List Sidebar */}
             <div className="md:col-span-3">
                 <h2 className="text-xl font-bold mb-4 text-white">Folders</h2>
                 {isLoading ? (
@@ -133,7 +125,6 @@ const Dashboard: React.FC = () => {
                 )}
             </div>
             
-            {/* Main Content */}
             <div className="md:col-span-9">
               {error ? (
                 <p className="text-red-400">{error}</p>
@@ -148,7 +139,11 @@ const Dashboard: React.FC = () => {
                     <h2 className="text-2xl font-bold mb-4 text-white">
                         {currentFolderName}
                     </h2>
-                    <UploadForm folderId={selectedFolder!} onUploadSuccess={handleUploadSuccess} />
+                    <UploadForm 
+                        folderId={selectedFolder!} 
+                        folderName={currentFolderName}
+                        onUploadSuccess={handleUploadSuccess} 
+                    />
                     <div className="mt-8 border-t border-gray-700 pt-8">
                         <h3 className="text-xl font-semibold mb-4 text-white">Images</h3>
                         <ImageGrid images={images} onDelete={handleDeleteImage} />
