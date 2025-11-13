@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { User, Folder } from '../types';
 import { api } from '../services/api';
@@ -24,6 +23,12 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
         </div>
     );
 };
+
+const TrashIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+);
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => {
   const [isUserModalOpen, setUserModalOpen] = useState(false);
@@ -81,6 +86,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
   const handleAssignUser = async () => {
     if(!assigningFolder || !selectedUserId) return;
     setLoading(true);
+    setError(null);
     try {
       await api.assignUserToFolder(selectedUserId, assigningFolder.id);
       setAssigningFolder(null);
@@ -90,6 +96,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
         setError('Failed to assign user.');
     } finally {
         setLoading(false);
+    }
+  };
+  
+  const handleDeleteUser = async (userId: string, username: string) => {
+    if (window.confirm(`Are you sure you want to delete the user "${username}"? This will also unassign them from all folders.`)) {
+        setLoading(true);
+        setError(null);
+        try {
+            await api.deleteUser(userId);
+            onUpdate();
+        } catch (e: any) {
+            setError(e.message || 'Failed to delete user.');
+        } finally {
+            setLoading(false);
+        }
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string, folderName: string) => {
+    if (window.confirm(`Are you sure you want to delete the folder "${folderName}"? All images inside will be lost permanently.`)) {
+        setLoading(true);
+        setError(null);
+        try {
+            await api.deleteFolder(folderId);
+            onUpdate();
+        } catch (e) {
+            setError('Failed to delete folder.');
+        } finally {
+            setLoading(false);
+        }
     }
   };
 
@@ -107,19 +143,41 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
         {/* User Management */}
         <div>
             <h3 className="text-lg font-semibold text-gray-200 mb-2">Users ({memberUsers.length})</h3>
-            <ul className="bg-gray-700/50 rounded-md p-2 max-h-60 overflow-y-auto">
-                {memberUsers.map(user => <li key={user.id} className="p-2 text-gray-300">{user.username}</li>)}
+            <ul className="bg-gray-700/50 rounded-md p-2 max-h-60 overflow-y-auto divide-y divide-gray-600/50">
+                {memberUsers.map(user => 
+                    <li key={user.id} className="p-2 text-gray-300 flex justify-between items-center">
+                        <span>{user.username}</span>
+                        <button
+                          onClick={() => handleDeleteUser(user.id, user.username)}
+                          className="text-red-400 hover:text-red-300 p-1 rounded-full hover:bg-gray-600"
+                          aria-label={`Delete user ${user.username}`}
+                          title={`Delete user ${user.username}`}
+                        >
+                            <TrashIcon />
+                        </button>
+                    </li>
+                )}
             </ul>
         </div>
 
         {/* Folder Management */}
         <div>
             <h3 className="text-lg font-semibold text-gray-200 mb-2">Folders ({folders.length})</h3>
-             <ul className="bg-gray-700/50 rounded-md p-2 max-h-60 overflow-y-auto">
+             <ul className="bg-gray-700/50 rounded-md p-2 max-h-60 overflow-y-auto divide-y divide-gray-600/50">
                 {folders.map(folder => (
-                    <li key={folder.id} className="p-2 text-gray-300 flex justify-between items-center">
-                        <span>{folder.name}</span>
-                        <button onClick={() => setAssigningFolder(folder)} className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded">Assign User</button>
+                    <li key={folder.id} className="p-2 text-gray-300 flex justify-between items-center gap-2">
+                        <span className="flex-grow truncate">{folder.name}</span>
+                        <div className="flex-shrink-0 flex items-center gap-2">
+                            <button onClick={() => setAssigningFolder(folder)} className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded">Assign</button>
+                            <button
+                                onClick={() => handleDeleteFolder(folder.id, folder.name)}
+                                className="text-red-400 hover:text-red-300 p-1 rounded-full hover:bg-gray-600"
+                                aria-label={`Delete folder ${folder.name}`}
+                                title={`Delete folder ${folder.name}`}
+                            >
+                                <TrashIcon />
+                            </button>
+                        </div>
                     </li>
                 ))}
             </ul>
@@ -157,7 +215,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
                 {memberUsers.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
             </select>
             {error && <p className="text-red-400 text-sm">{error}</p>}
-            <button onClick={handleAssignUser} disabled={loading} className="w-full bg-green-600 hover:bg-green-700 text-white p-2 rounded disabled:bg-green-800">
+            <button onClick={handleAssignUser} disabled={loading || !selectedUserId} className="w-full bg-green-600 hover:bg-green-700 text-white p-2 rounded disabled:bg-green-800 disabled:opacity-50">
                 {loading ? 'Assigning...' : 'Assign User'}
             </button>
         </div>
