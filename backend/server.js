@@ -16,12 +16,10 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Kết nối Database (PostgreSQL)
+// Kết nối Database (PostgreSQL) - ĐƠN GIẢN HÓA
+// Bỏ cấu hình SSL phức tạp và để pg tự xử lý dựa trên connection string
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
 });
 
 // Kết nối DigitalOcean Spaces (S3-compatible)
@@ -71,14 +69,19 @@ app.post('/api/login', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
     const user = result.rows[0];
-    if (!user) return res.status(400).send('Invalid credentials');
-    if (await bcrypt.compare(password, user.password_hash)) {
+    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+    
+    const isPasswordCorrect = await bcrypt.compare(password, user.password_hash);
+    if (isPasswordCorrect) {
       const accessToken = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
       res.json({ accessToken, user: { id: user.id, username: user.username, role: user.role } });
     } else {
-      res.status(400).send('Invalid credentials');
+      res.status(400).json({ message: 'Invalid credentials' });
     }
-  } catch (error) { res.status(500).send('Server error'); }
+  } catch (error) {
+    console.error('!!! LOGIN ERROR:', error);
+    res.status(500).json({ error: 'Server error during login process.' });
+  }
 });
 
 // USERS
@@ -86,19 +89,25 @@ app.get('/api/users', authenticateToken, isAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT id, username, role FROM users');
         res.json(result.rows);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        console.error('Get All Users Error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.post('/api/users', authenticateToken, isAdmin, async (req, res) => {
     const { username, password } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
     try {
+        const hashedPassword = await bcrypt.hash(password, 10);
         const result = await pool.query(
             'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role',
             [username, hashedPassword, 'MEMBER']
         );
         res.status(201).json(result.rows[0]);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        console.error('Create User Error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.put('/api/users/change-password', authenticateToken, async (req, res) => {
@@ -117,6 +126,7 @@ app.put('/api/users/change-password', authenticateToken, async (req, res) => {
 
         res.status(200).json({ message: 'Password updated successfully' });
     } catch (error) {
+        console.error('Change Password Error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -126,7 +136,10 @@ app.delete('/api/users/:id', authenticateToken, isAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM users WHERE id = $1 AND role != $2', [req.params.id, 'ADMIN']);
         res.sendStatus(204);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        console.error('Delete User Error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // FOLDERS
@@ -134,7 +147,10 @@ app.get('/api/folders', authenticateToken, isAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM folders ORDER BY name ASC');
         res.json(result.rows);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        console.error('Get All Folders Error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.post('/api/folders', authenticateToken, isAdmin, async (req, res) => {
@@ -142,7 +158,10 @@ app.post('/api/folders', authenticateToken, isAdmin, async (req, res) => {
     try {
         const result = await pool.query('INSERT INTO folders (name) VALUES ($1) RETURNING *', [name]);
         res.status(201).json(result.rows[0]);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        console.error('Create Folder Error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.delete('/api/folders/:id', authenticateToken, isAdmin, async (req, res) => {
@@ -160,6 +179,7 @@ app.delete('/api/folders/:id', authenticateToken, isAdmin, async (req, res) => {
         res.sendStatus(204);
     } catch (error) {
         await client.query('ROLLBACK');
+        console.error('Delete Folder Error:', error);
         res.status(500).json({ error: error.message });
     } finally {
         client.release();
@@ -171,7 +191,10 @@ app.post('/api/folders/assign', authenticateToken, isAdmin, async (req, res) => 
     try {
         await pool.query('INSERT INTO folder_assignments (user_id, folder_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, folderId]);
         res.sendStatus(200);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        console.error('Assign User Error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // DATA FOR LOGGED IN USERS
@@ -185,7 +208,10 @@ app.get('/api/users/:userId/folders', authenticateToken, async (req, res) => {
             [req.params.userId]
         );
         res.json(result.rows);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        console.error('Get User Folders Error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.get('/api/folders/:folderId/images', authenticateToken, async (req, res) => {
@@ -209,6 +235,7 @@ app.get('/api/folders/:folderId/images', authenticateToken, async (req, res) => 
         );
         res.json(result.rows);
     } catch (error) { 
+        console.error('Get Images in Folder Error:', error);
         res.status(500).json({ error: error.message }); 
     }
 });
@@ -259,6 +286,7 @@ app.delete('/api/images/:id', authenticateToken, async (req, res) => {
         res.sendStatus(204);
     } catch (error) {
         await client.query('ROLLBACK');
+        console.error('Delete Image Error:', error);
         res.status(500).json({ error: error.message });
     } finally {
         client.release();
