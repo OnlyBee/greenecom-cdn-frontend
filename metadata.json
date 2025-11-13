@@ -1,0 +1,5 @@
+{
+  "name": "Greenecom CDN Manager",
+  "description": "An internal tool for Greenecom members to upload and manage images on the company's CDN. It features role-based access for admins and members, folder management, and easy image link sharing.",
+  "requestFramePermissions": []
+}
