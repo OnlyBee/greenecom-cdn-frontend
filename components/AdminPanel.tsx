@@ -1,28 +1,14 @@
+
 import React, { useState } from 'react';
 import type { User, Folder } from '../types';
 import { api } from '../services/api';
+import Modal from './Modal';
 
 interface AdminPanelProps {
   users: User[];
   folders: Folder[];
   onUpdate: () => void;
 }
-
-// NOTE: This component is defined outside AdminPanel to avoid re-rendering issues.
-const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50" onClick={onClose}>
-            <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-semibold text-white">{title}</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white">&times;</button>
-                </div>
-                {children}
-            </div>
-        </div>
-    );
-};
 
 const TrashIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">

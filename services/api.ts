@@ -1,3 +1,4 @@
+
 import type { User, Folder, ImageFile } from '../types';
 
 const API_BASE_URL = '/api';
@@ -104,6 +105,11 @@ export const api = {
   assignUserToFolder: (userId: string, folderId: string) => request<void>('/folders/assign', {
     method: 'POST',
     body: JSON.stringify({ userId, folderId }),
+  }),
+
+  changePassword: (currentPassword: string, newPassword: string) => request<void>('/users/change-password', {
+    method: 'PUT',
+    body: JSON.stringify({ currentPassword, newPassword }),
   }),
   
   deleteImage: (imageId: string) => request<void>(`/images/${imageId}`, {

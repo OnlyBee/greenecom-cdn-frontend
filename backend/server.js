@@ -1,3 +1,4 @@
+
 // Import các thư viện cần thiết
 require('dotenv').config();
 const express = require('express');
@@ -80,7 +81,7 @@ app.post('/api/login', async (req, res) => {
   } catch (error) { res.status(500).send('Server error'); }
 });
 
-// USERS (Admin only)
+// USERS
 app.get('/api/users', authenticateToken, isAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT id, username, role FROM users');
@@ -100,6 +101,27 @@ app.post('/api/users', authenticateToken, isAdmin, async (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+app.put('/api/users/change-password', authenticateToken, async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+    try {
+        const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+        const user = result.rows[0];
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+        if (!isMatch) return res.status(400).json({ error: 'Incorrect current password' });
+
+        const newHashedPassword = await bcrypt.hash(newPassword, 10);
+        await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHashedPassword, userId]);
+
+        res.status(200).json({ message: 'Password updated successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
 app.delete('/api/users/:id', authenticateToken, isAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM users WHERE id = $1 AND role != $2', [req.params.id, 'ADMIN']);
@@ -107,7 +129,7 @@ app.delete('/api/users/:id', authenticateToken, isAdmin, async (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// FOLDERS (Admin only for creation/deletion)
+// FOLDERS
 app.get('/api/folders', authenticateToken, isAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM folders ORDER BY name ASC');
@@ -167,14 +189,28 @@ app.get('/api/users/:userId/folders', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/folders/:folderId/images', authenticateToken, async (req, res) => {
-    // Add logic to check if user has access to this folder
+    const { folderId } = req.params;
+    const { id: userId, role } = req.user;
+
     try {
+        if (role !== 'ADMIN') {
+            const accessCheck = await pool.query(
+                'SELECT 1 FROM folder_assignments WHERE user_id = $1 AND folder_id = $2',
+                [userId, folderId]
+            );
+            if (accessCheck.rows.length === 0) {
+                return res.status(403).json({ error: 'Access denied to this folder' });
+            }
+        }
+
         const result = await pool.query(
             "SELECT id, name, url, uploaded_at as \"uploadedAt\", url as \"displayUrl\" FROM images WHERE folder_id = $1 ORDER BY \"uploadedAt\" DESC", 
-            [req.params.folderId]
+            [folderId]
         );
         res.json(result.rows);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) { 
+        res.status(500).json({ error: error.message }); 
+    }
 });
 
 // IMAGES

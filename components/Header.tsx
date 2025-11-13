@@ -1,29 +1,43 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import ChangePasswordModal from './ChangePasswordModal';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
-    <header className="bg-gray-800 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
-            <span className="font-bold text-xl text-green-400">Greenecom CDN</span>
-          </div>
-          <div className="flex items-center">
-            <span className="text-gray-300 mr-4">Welcome, <span className="font-medium text-white">{user?.username}</span></span>
-            <button
-              onClick={logout}
-              className="px-3 py-2 rounded-md text-sm font-medium text-white bg-gray-700 hover:bg-red-600 transition-colors"
-            >
-              Logout
-            </button>
+    <>
+      <header className="bg-gray-800 shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <span className="font-bold text-xl text-green-400">Greenecom CDN</span>
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="text-gray-300">Welcome, <span className="font-medium text-white">{user?.username}</span></span>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="px-3 py-2 rounded-md text-sm font-medium text-white bg-gray-700 hover:bg-blue-600 transition-colors"
+              >
+                Change Password
+              </button>
+              <button
+                onClick={logout}
+                className="px-3 py-2 rounded-md text-sm font-medium text-white bg-gray-700 hover:bg-red-600 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+      <ChangePasswordModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
+    </>
   );
 };
 
