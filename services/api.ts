@@ -226,4 +226,39 @@ export const api = {
     db.images[folderId] = db.images[folderId].filter(img => img.id !== imageId);
     saveDb();
   },
+
+  async deleteUser(userId: string): Promise<void> {
+    await delay(500);
+    const userIndex = db.users.findIndex(u => u.id === userId);
+    if (userIndex === -1) {
+      throw new Error('User not found');
+    }
+    if (db.users[userIndex].role === Role.ADMIN) {
+        throw new Error('Cannot delete the administrator account.');
+    }
+
+    db.users.splice(userIndex, 1);
+
+    // Unassign this user from all folders
+    db.folders.forEach(folder => {
+        const assignmentIndex = folder.assignedUserIds.indexOf(userId);
+        if (assignmentIndex > -1) {
+            folder.assignedUserIds.splice(assignmentIndex, 1);
+        }
+    });
+
+    saveDb();
+  },
+
+  async deleteFolder(folderId: string): Promise<void> {
+    await delay(500);
+    const folderIndex = db.folders.findIndex(f => f.id === folderId);
+    if (folderIndex === -1) {
+        throw new Error('Folder not found');
+    }
+
+    db.folders.splice(folderIndex, 1);
+    delete db.images[folderId];
+    saveDb();
+  },
 };
