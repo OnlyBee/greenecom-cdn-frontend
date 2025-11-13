@@ -24,6 +24,7 @@ const Dashboard: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
+      let availableFolders: Folder[] = [];
       if (user.role === Role.ADMIN) {
         const [usersData, foldersData] = await Promise.all([
           api.getAllUsers(),
@@ -31,17 +32,25 @@ const Dashboard: React.FC = () => {
         ]);
         setAllUsers(usersData);
         setAllFolders(foldersData);
-        setFolders(foldersData); // Admin sees all folders
-        if (foldersData.length > 0 && !selectedFolder) {
-          setSelectedFolder(foldersData[0].id);
-        }
+        availableFolders = foldersData;
       } else {
         const userFolders = await api.getFoldersForUser(user.id);
-        setFolders(userFolders);
-        if (userFolders.length > 0 && !selectedFolder) {
-          setSelectedFolder(userFolders[0].id);
-        }
+        availableFolders = userFolders;
       }
+      setFolders(availableFolders);
+
+      // Post-fetch logic for selecting a folder
+      const selectedFolderStillExists = selectedFolder && availableFolders.some(f => f.id === selectedFolder);
+      
+      if (!selectedFolderStillExists) {
+          if (availableFolders.length > 0) {
+              setSelectedFolder(availableFolders[0].id);
+          } else {
+              setSelectedFolder(null); // No folders available
+          }
+      }
+      // If selected folder still exists, we don't need to do anything.
+
     } catch (e) {
       setError('Failed to fetch data.');
     } finally {
@@ -71,6 +80,9 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (selectedFolder) {
       fetchImages();
+    } else {
+      // Clear images if no folder is selected
+      setImages([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFolder]);
