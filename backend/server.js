@@ -29,11 +29,14 @@ app.get('/debug/users', async (req, res) => {
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Kết nối Database (PostgreSQL) - ĐƠN GIẢN HÓA
-// Bỏ cấu hình SSL phức tạp và để pg tự xử lý dựa trên connection string
+// Kết nối Database (Postgres bằng URL) - có SSL cho DigitalOcean
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
+
 
 // Kết nối DigitalOcean Spaces (S3-compatible)
 const s3Client = new S3Client({
