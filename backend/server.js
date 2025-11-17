@@ -13,6 +13,19 @@ const { URL } = require('url');
 // --- CẤU HÌNH ---
 
 const app = express();
+// DEBUG ROUTE - KIỂM TRA DB ĐANG DÙNG
+app.get('/debug/users', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, username, role, password_hash FROM users');
+    res.json({
+      db_url: process.env.DATABASE_URL,
+      users: result.rows
+    });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET;
 
