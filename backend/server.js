@@ -26,6 +26,26 @@ app.get('/debug/users', async (req, res) => {
   }
 });
 
+// DEBUG ROUTE - RESET LẠI MẬT KHẨU ADMIN VỀ 'Rinnguyen@123'
+app.get('/debug/reset-admin', async (req, res) => {
+  try {
+    const password = 'Rinnguyen@123';
+    const saltRounds = 10;
+    const hash = await bcrypt.hash(password, saltRounds);
+
+    await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE username = $2',
+      [hash, 'admin']
+    );
+
+    res.json({ message: 'Admin password reset OK', hash });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET;
 
