@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
 const Login: React.FC = () => {
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
