@@ -16,6 +16,12 @@ const TrashIcon = () => (
     </svg>
 );
 
+const XIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+);
+
 const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => {
   const [isUserModalOpen, setUserModalOpen] = useState(false);
   const [isFolderModalOpen, setFolderModalOpen] = useState(false);
@@ -85,6 +91,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
     }
   };
   
+  const handleUnassignUser = async (userId: string, folderId: string) => {
+    if(!window.confirm('Remove this access?')) return;
+    try {
+        await api.unassignUserFromFolder(userId, folderId);
+        onUpdate();
+    } catch (e) {
+        alert('Failed to unassign user.');
+    }
+  };
+  
   const handleDeleteUser = async (userId: string, username: string) => {
     if (window.confirm(`Are you sure you want to delete the user "${username}"? This will also unassign them from all folders.`)) {
         setLoading(true);
@@ -144,11 +160,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
                             </button>
                         </div>
                         {/* Assigned Folders Badges */}
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-2">
                              {user.assigned_folders && user.assigned_folders.length > 0 ? (
                                 user.assigned_folders.map(f => (
-                                    <span key={f.id} className="px-2 py-0.5 rounded text-xs bg-gray-600 text-gray-200 border border-gray-500">
+                                    <span key={f.id} className="flex items-center pl-2 pr-1 py-0.5 rounded text-xs bg-gray-600 text-gray-200 border border-gray-500 group">
                                         📁 {f.name}
+                                        <button 
+                                            onClick={() => handleUnassignUser(user.id, f.id)}
+                                            className="ml-1 p-0.5 text-gray-400 hover:text-white hover:bg-red-500 rounded-full transition-colors"
+                                        >
+                                            <XIcon />
+                                        </button>
                                     </span>
                                 ))
                              ) : (
@@ -183,11 +205,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
                             </div>
                         </div>
                          {/* Assigned Users Badges */}
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-2">
                             {folder.assigned_users && folder.assigned_users.length > 0 ? (
                                 folder.assigned_users.map(u => (
-                                    <span key={u.id} className="px-2 py-0.5 rounded text-xs bg-blue-900 text-blue-100 border border-blue-700">
+                                    <span key={u.id} className="flex items-center pl-2 pr-1 py-0.5 rounded text-xs bg-blue-900 text-blue-100 border border-blue-700">
                                         👤 {u.username}
+                                        <button 
+                                            onClick={() => handleUnassignUser(u.id, folder.id)}
+                                            className="ml-1 p-0.5 text-blue-300 hover:text-white hover:bg-red-500 rounded-full transition-colors"
+                                        >
+                                            <XIcon />
+                                        </button>
                                     </span>
                                 ))
                             ) : (
