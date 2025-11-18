@@ -86,7 +86,24 @@ app.post(['/login', '/api/login'], async (req, res) => {
 // 2. Users
 app.get(['/users', '/api/users'], authenticateToken, isAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, role FROM users ORDER BY username ASC');
+    // Lấy user kèm danh sách các folder được assign
+    const query = `
+      SELECT 
+        u.id, 
+        u.username, 
+        u.role,
+        COALESCE(
+          json_agg(json_build_object('id', f.id, 'name', f.name)) 
+          FILTER (WHERE f.id IS NOT NULL), 
+          '[]'
+        ) as assigned_folders
+      FROM users u
+      LEFT JOIN folder_assignments fa ON u.id = fa.user_id
+      LEFT JOIN folders f ON fa.folder_id = f.id
+      GROUP BY u.id
+      ORDER BY u.username ASC
+    `;
+    const result = await pool.query(query);
     res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -130,7 +147,22 @@ app.put(['/users/change-password', '/api/users/change-password'], authenticateTo
 // 3. Folders
 app.get(['/folders', '/api/folders'], authenticateToken, isAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM folders ORDER BY name ASC');
+    // Lấy folder kèm danh sách user được assign
+    const query = `
+      SELECT 
+        f.*,
+        COALESCE(
+          json_agg(json_build_object('id', u.id, 'username', u.username)) 
+          FILTER (WHERE u.id IS NOT NULL), 
+          '[]'
+        ) as assigned_users
+      FROM folders f
+      LEFT JOIN folder_assignments fa ON f.id = fa.folder_id
+      LEFT JOIN users u ON fa.user_id = u.id
+      GROUP BY f.id
+      ORDER BY f.name ASC
+    `;
+    const result = await pool.query(query);
     res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -169,7 +201,6 @@ app.post(['/folders/assign', '/api/folders/assign'], authenticateToken, isAdmin,
       'INSERT INTO folder_assignments (user_id, folder_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
       [userId, folderId]
     );
-    // FIX: Return JSON so frontend doesn't crash on response.json()
     res.status(200).json({ success: true, message: 'Assigned successfully' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -210,16 +241,21 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
   
   try {
     const { folderId, folderSlug } = req.body;
+    
+    if (!folderId) {
+      return res.status(400).json({ error: 'Folder ID is missing' });
+    }
+
     // Sanitize filename to prevent issues with spaces/unicode in S3 Keys
     const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
     const slug = folderSlug || 'default';
     const key = `${slug}/${Date.now()}-${safeFilename}`;
     
+    // REMOVED: ACL: 'public-read' to fix potential 500 errors on buckets that disable ACLs.
     await s3Client.send(new PutObjectCommand({
       Bucket: process.env.SPACES_BUCKET,
       Key: key,
       Body: req.file.buffer,
-      ACL: 'public-read',
       ContentType: req.file.mimetype,
     }));
     
@@ -232,7 +268,8 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
     res.status(201).json(result.rows[0]);
   } catch (e) { 
     console.error('Upload Error:', e); 
-    res.status(500).json({ error: 'Upload failed' }); 
+    // Return specific error message for debugging
+    res.status(500).json({ error: e.message || 'Upload failed' }); 
   }
 });
 
@@ -258,7 +295,7 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
       [fileName, imageUrl, folderId]
     );
     res.status(201).json(result.rows[0]);
-  } catch (e) { console.error(e); res.status(500).json({ error: 'Save URL failed' }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: e.message || 'Save URL failed' }); }
 });
 
 app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, res) => {
