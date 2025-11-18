@@ -54,7 +54,6 @@ const slugify = (text: string) => {
 // --- API Functions ---
 export const api = {
   async login(username: string, password: string): Promise<User> {
-    // Login is special, handled in context usually, but keeping here for consistency
     const response = await fetch(`${API_BASE_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -62,7 +61,6 @@ export const api = {
     });
     if (!response.ok) throw new Error('Invalid credentials');
     const data = await response.json();
-    // Note: Token storage is usually handled by AuthContext, but this function returns user
     return data.user;
   },
 
@@ -71,6 +69,7 @@ export const api = {
   getFoldersForUser: (userId: string) => request<Folder[]>(`/users/${userId}/folders`),
   getImagesInFolder: (folderId: string) => request<ImageFile[]>(`/folders/${folderId}/images`),
 
+  // 1. Upload File
   async uploadImage(file: File, folderId: string, folderName: string): Promise<void> {
     const folderSlug = slugify(folderName);
     const formData = new FormData();
@@ -78,7 +77,6 @@ export const api = {
     formData.append('folderId', folderId);
     formData.append('folderSlug', folderSlug);
     
-    // Custom fetch for FormData
     const token = getToken();
     const headers: HeadersInit = {};
     if (token) {
@@ -94,6 +92,14 @@ export const api = {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Upload failed');
     }
+  },
+
+  // 2. Upload via URL (New)
+  async uploadImageUrl(imageUrl: string, folderId: string): Promise<void> {
+      return request<void>('/upload/url', {
+          method: 'POST',
+          body: JSON.stringify({ folderId, imageUrl })
+      });
   },
 
   createUser: (username: string, password: string) => request<User>('/users', {
