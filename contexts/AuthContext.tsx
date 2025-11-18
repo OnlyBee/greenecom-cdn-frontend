@@ -1,104 +1,122 @@
+// src/contexts/AuthContext.tsx
+
 import React, {
   createContext,
-  useState,
-  useEffect,
-  ReactNode,
   useContext,
+  useEffect,
+  useState,
+  ReactNode,
 } from 'react';
 
-export type User = {
-  id: string;
+type Role = 'ADMIN' | 'MEMBER' | string;
+
+type User = {
   username: string;
-  role: 'ADMIN' | 'MEMBER';
+  role: Role;
 };
 
 type AuthContextType = {
   user: User | null;
+  token: string | null;
+  loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  loading: boolean;
 };
 
 export const AuthContext = createContext<AuthContextType | undefined>(
   undefined
 );
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+const TOKEN_KEY = 'greenecom_token';
+const USER_KEY = 'greenecom_user';
 
-  // Lấy user + token từ localStorage khi load lại trang
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Load từ localStorage khi mở trang
   useEffect(() => {
+    const savedToken = localStorage.getItem(TOKEN_KEY);
+    const savedUser = localStorage.getItem(USER_KEY);
+
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {
+        setUser(null);
+      }
+    }
+
+    setLoading(false);
+  }, []);
+
+  const login = async (username: string, password: string) => {
     setLoading(true);
     try {
-      const storedUser = localStorage.getItem('user');
-      const storedToken =
-        localStorage.getItem('accessToken') || localStorage.getItem('token');
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
 
-      if (storedUser && storedToken) {
-        setUser(JSON.parse(storedUser));
+      if (!res.ok) {
+        // backend có thể trả JSON hoặc text
+        let msg = 'Invalid username or password';
+        try {
+          const data = await res.json();
+          msg = data.message || msg;
+        } catch {
+          const text = await res.text();
+          if (text) msg = text;
+        }
+        throw new Error(msg);
       }
-    } catch (e) {
-      console.error('Auth load error:', e);
-      localStorage.clear();
+
+      // backend: { token, role, username }
+      const data = await res.json();
+
+      if (!data.token) {
+        throw new Error('No token received from server');
+      }
+
+      const userData: User = {
+        username: data.username ?? username,
+        role: data.role ?? 'MEMBER',
+      };
+
+      setToken(data.token);
+      setUser(userData);
+
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(userData));
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  // LOGIN: gọi đúng /api/login, nhận { accessToken, user }
-const login = async (username: string, password: string) => {
-  const res = await fetch('/api/login', {    // <-- phải là /api/login
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ username, password }),
-  });
-
-  if (!res.ok) {
-    throw new Error('Invalid username or password');
-  }
-
-  const data = await res.json();
-
-  const token = data.accessToken || data.token;
-  if (!token) throw new Error('No token returned from server');
-
-  localStorage.setItem('accessToken', token);
-  localStorage.setItem('token', token);
-
-  if (data.user) {
-    localStorage.setItem('user', JSON.stringify(data.user));
-    setUser(data.user);
-  } else {
-    setUser(null);
-  }
-};
-
+  };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('token');
+    setToken(null);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
   };
 
   const value: AuthContextType = {
     user,
+    token,
+    loading,
     login,
     logout,
-    loading,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Hook dùng trong useAuth.ts
+// Hook dùng trong app
 export const useAuthContext = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) {
