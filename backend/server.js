@@ -107,7 +107,7 @@ function isAdmin(req, res, next) {
 
 // ---------- AUTH ROUTES ----------
 
-// ĐĂNG NHẬP: được map qua /login (đã cấu hình route ở DO App Platform)
+// ĐĂNG NHẬP: được map qua /login và /api/login
 app.post(['/login', '/api/login'], async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -151,7 +151,8 @@ app.post(['/login', '/api/login'], async (req, res) => {
 // ---------- USERS ----------
 
 // Lấy toàn bộ users (ADMIN)
-app.get('/api/users', authenticateToken, isAdmin, async (req, res) => {
+// Hỗ trợ cả /users và /api/users để tránh lỗi 404
+app.get(['/users', '/api/users'], authenticateToken, isAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT id, username, role FROM users ORDER BY username ASC'
@@ -164,7 +165,7 @@ app.get('/api/users', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Tạo user MEMBER mới (ADMIN)
-app.post('/api/users', authenticateToken, isAdmin, async (req, res) => {
+app.post(['/users', '/api/users'], authenticateToken, isAdmin, async (req, res) => {
   const { username, password } = req.body;
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -181,7 +182,7 @@ app.post('/api/users', authenticateToken, isAdmin, async (req, res) => {
 
 // Đổi mật khẩu cho user đang đăng nhập
 app.put(
-  '/api/users/change-password',
+  ['/users/change-password', '/api/users/change-password'],
   authenticateToken,
   async (req, res) => {
     const { currentPassword, newPassword } = req.body;
@@ -219,7 +220,7 @@ app.put(
 
 // Xoá user (trừ ADMIN)
 app.delete(
-  '/api/users/:id',
+  ['/users/:id', '/api/users/:id'],
   authenticateToken,
   isAdmin,
   async (req, res) => {
@@ -239,7 +240,7 @@ app.delete(
 // ---------- FOLDERS (ADMIN) ----------
 
 // Lấy tất cả folders (ADMIN)
-app.get('/api/folders', authenticateToken, isAdmin, async (req, res) => {
+app.get(['/folders', '/api/folders'], authenticateToken, isAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT * FROM folders ORDER BY name ASC'
@@ -252,7 +253,7 @@ app.get('/api/folders', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Tạo folder mới (ADMIN)
-app.post('/api/folders', authenticateToken, isAdmin, async (req, res) => {
+app.post(['/folders', '/api/folders'], authenticateToken, isAdmin, async (req, res) => {
   const { name } = req.body;
   try {
     const result = await pool.query(
@@ -268,7 +269,7 @@ app.post('/api/folders', authenticateToken, isAdmin, async (req, res) => {
 
 // Xoá folder (ADMIN) – xoá luôn ảnh trong S3
 app.delete(
-  '/api/folders/:id',
+  ['/folders/:id', '/api/folders/:id'],
   authenticateToken,
   isAdmin,
   async (req, res) => {
@@ -307,7 +308,7 @@ app.delete(
 
 // Gán user vào folder (ADMIN)
 app.post(
-  '/api/folders/assign',
+  ['/folders/assign', '/api/folders/assign'],
   authenticateToken,
   isAdmin,
   async (req, res) => {
@@ -329,7 +330,7 @@ app.post(
 
 // Folders mà user hiện tại được gán (dùng cho sidebar "Folders")
 app.get(
-  '/api/users/:userId/folders',
+  ['/users/:userId/folders', '/api/users/:userId/folders'],
   authenticateToken,
   async (req, res) => {
     const requestedUserId = req.params.userId;
@@ -359,7 +360,7 @@ app.get(
 
 // Các ảnh trong 1 folder – có check quyền nếu không phải ADMIN
 app.get(
-  '/api/folders/:folderId/images',
+  ['/folders/:folderId/images', '/api/folders/:folderId/images'],
   authenticateToken,
   async (req, res) => {
     const { folderId } = req.params;
@@ -399,7 +400,7 @@ app.get(
 
 // ---------- IMAGES (UPLOAD / DELETE) ----------
 
-app.post('/api/upload', authenticateToken, upload, async (req, res) => {
+app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res) => {
   if (!req.file)
     return res.status(400).json({ error: 'No file uploaded.' });
 
@@ -432,7 +433,7 @@ app.post('/api/upload', authenticateToken, upload, async (req, res) => {
 });
 
 app.delete(
-  '/api/images/:id',
+  ['/images/:id', '/api/images/:id'],
   authenticateToken,
   async (req, res) => {
     const client = await pool.connect();
