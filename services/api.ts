@@ -73,9 +73,13 @@ export const api = {
   async uploadImage(file: File, folderId: string, folderName: string): Promise<void> {
     const folderSlug = slugify(folderName);
     const formData = new FormData();
-    formData.append('image', file);
+    
+    // IMPORTANT: Append text fields BEFORE the file.
+    // Some middleware (like multer) might need these fields available
+    // before it finishes processing the file stream.
     formData.append('folderId', folderId);
     formData.append('folderSlug', folderSlug);
+    formData.append('image', file);
     
     const token = getToken();
     const headers: HeadersInit = {};
