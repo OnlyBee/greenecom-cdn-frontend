@@ -1,4 +1,6 @@
-// Import các thư viện cần thiết
+// backend/server.js
+
+// ---------- IMPORT CÁC THƯ VIỆN ----------
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -13,13 +15,12 @@ const {
 } = require('@aws-sdk/client-s3');
 const { URL } = require('url');
 
-// --- CẤU HÌNH CƠ BẢN ---
-
+// ---------- CẤU HÌNH CƠ BẢN ----------
 const app = express();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Kết nối Database (Postgres bằng URL) - có SSL cho DigitalOcean
+// Kết nối Database (Postgres) – dùng DATABASE_URL của DO
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -41,42 +42,14 @@ const s3Client = new S3Client({
 app.use(cors());
 app.use(express.json());
 
-// Cấu hình Multer để xử lý upload file vào bộ nhớ tạm
+// Multer để đọc file upload vào memory
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage }).single('image');
+const upload = multer({ storage }).single('image');
 
-// --- MIDDLEWARE XÁC THỰC ---
+// ---------- DEBUG ROUTES (tùy chọn) ----------
 
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // "Bearer xxx"
-
-  if (!token) {
-    return res.sendStatus(401);
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      console.error('JWT verify error:', err);
-      return res.sendStatus(403);
-    }
-    // user: { id, username, role, iat, exp }
-    req.user = user;
-    next();
-  });
-}
-
-function isAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'ADMIN') {
-    return res.status(403).send('Access denied. Admins only.');
-  }
-  next();
-}
-
-// --- DEBUG ROUTES (chỉ dùng để kiểm tra) ---
-
-// Xem danh sách user + DB URL đang dùng
-app.get('/debug/users', async (req, res) => {
+// Xem nhanh DB đang dùng & list user
+app.get(['/debug/users', '/api/debug/users'], async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT id, username, role, password_hash FROM users'
@@ -86,13 +59,12 @@ app.get('/debug/users', async (req, res) => {
       users: result.rows,
     });
   } catch (err) {
-    console.error(err);
-    res.json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Reset mật khẩu admin về 'Rinnguyen@123'
-app.get('/debug/reset-admin', async (req, res) => {
+// Reset mật khẩu admin về "Rinnguyen@123"
+app.get(['/debug/reset-admin', '/api/debug/reset-admin'], async (req, res) => {
   try {
     const password = 'Rinnguyen@123';
     const saltRounds = 10;
@@ -110,10 +82,33 @@ app.get('/debug/reset-admin', async (req, res) => {
   }
 });
 
-// --- AUTH: LOGIN ---
+// ---------- AUTH MIDDLEWARE ----------
 
-// Dùng chung 1 handler cho cả /login và /api/login
-async function loginHandler(req, res) {
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, JWT_SECRET, (err, payload) => {
+    if (err) return res.sendStatus(403);
+    // payload sẽ có { id, username, role }
+    req.user = payload;
+    next();
+  });
+}
+
+function isAdmin(req, res, next) {
+  if (!req.user || req.user.role !== 'ADMIN') {
+    return res.status(403).send('Access denied. Admins only.');
+  }
+  next();
+}
+
+// ---------- AUTH ROUTES ----------
+
+// ĐĂNG NHẬP: được map qua /login (đã cấu hình route ở DO App Platform)
+app.post(['/login', '/api/login'], async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -123,7 +118,6 @@ async function loginHandler(req, res) {
         .json({ message: 'Username and password are required' });
     }
 
-    // Lấy user từ DB
     const result = await pool.query(
       'SELECT id, username, password_hash, role FROM users WHERE username = $1',
       [username]
@@ -134,44 +128,34 @@ async function loginHandler(req, res) {
     }
 
     const user = result.rows[0];
-
-    // So sánh password
     const isMatch = await bcrypt.compare(password, user.password_hash);
+
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
-    // Tạo JWT – payload chứa id + username + role
-    const accessToken = jwt.sign(
+    // Quan trọng: dùng "id" để khớp với các route phía dưới
+    const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    return res.json({
-      accessToken,
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-      },
-    });
+    return res.json({ token });
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ message: 'Internal server error' });
   }
-}
+});
 
-// Map cả hai URL để an toàn (tùy DO route thế nào cũng chạy được)
-app.post('/login', loginHandler);
-app.post('/api/login', loginHandler);
+// ---------- USERS ----------
 
-// --- USERS ---
-
-// Lấy toàn bộ user (ADMIN)
+// Lấy toàn bộ users (ADMIN)
 app.get('/api/users', authenticateToken, isAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, role FROM users');
+    const result = await pool.query(
+      'SELECT id, username, role FROM users ORDER BY username ASC'
+    );
     res.json(result.rows);
   } catch (error) {
     console.error('Get All Users Error:', error);
@@ -179,7 +163,7 @@ app.get('/api/users', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// Tạo user mới (mặc định role MEMBER)
+// Tạo user MEMBER mới (ADMIN)
 app.post('/api/users', authenticateToken, isAdmin, async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -195,53 +179,66 @@ app.post('/api/users', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// Đổi mật khẩu cho user hiện tại
-app.put('/api/users/change-password', authenticateToken, async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  const userId = req.user.id;
+// Đổi mật khẩu cho user đang đăng nhập
+app.put(
+  '/api/users/change-password',
+  authenticateToken,
+  async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
 
-  try {
-    const result = await pool.query(
-      'SELECT password_hash FROM users WHERE id = $1',
-      [userId]
-    );
-    const user = result.rows[0];
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    try {
+      const result = await pool.query(
+        'SELECT password_hash FROM users WHERE id = $1',
+        [userId]
+      );
+      const user = result.rows[0];
 
-    const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
-    if (!isMatch)
-      return res.status(400).json({ error: 'Incorrect current password' });
+      if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const newHashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [
-      newHashedPassword,
-      userId,
-    ]);
+      const isMatch = await bcrypt.compare(
+        currentPassword,
+        user.password_hash
+      );
+      if (!isMatch)
+        return res.status(400).json({ error: 'Incorrect current password' });
 
-    res.status(200).json({ message: 'Password updated successfully' });
-  } catch (error) {
-    console.error('Change Password Error:', error);
-    res.status(500).json({ error: error.message });
+      const newHashedPassword = await bcrypt.hash(newPassword, 10);
+      await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [
+        newHashedPassword,
+        userId,
+      ]);
+
+      res.status(200).json({ message: 'Password updated successfully' });
+    } catch (error) {
+      console.error('Change Password Error:', error);
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
-// Xoá user (không xoá ADMIN)
-app.delete('/api/users/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    await pool.query(
-      'DELETE FROM users WHERE id = $1 AND role != $2',
-      [req.params.id, 'ADMIN']
-    );
-    res.sendStatus(204);
-  } catch (error) {
-    console.error('Delete User Error:', error);
-    res.status(500).json({ error: error.message });
+// Xoá user (trừ ADMIN)
+app.delete(
+  '/api/users/:id',
+  authenticateToken,
+  isAdmin,
+  async (req, res) => {
+    try {
+      await pool.query(
+        'DELETE FROM users WHERE id = $1 AND role != $2',
+        [req.params.id, 'ADMIN']
+      );
+      res.sendStatus(204);
+    } catch (error) {
+      console.error('Delete User Error:', error);
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
-// --- FOLDERS ---
+// ---------- FOLDERS (ADMIN) ----------
 
-// Lấy toàn bộ folder (ADMIN)
+// Lấy tất cả folders (ADMIN)
 app.get('/api/folders', authenticateToken, isAdmin, async (req, res) => {
   try {
     const result = await pool.query(
@@ -269,41 +266,46 @@ app.post('/api/folders', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// Xoá folder + xoá ảnh trong folder (ADMIN)
-app.delete('/api/folders/:id', authenticateToken, isAdmin, async (req, res) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+// Xoá folder (ADMIN) – xoá luôn ảnh trong S3
+app.delete(
+  '/api/folders/:id',
+  authenticateToken,
+  isAdmin,
+  async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const imagesResult = await client.query(
-      'SELECT url FROM images WHERE folder_id = $1',
-      [req.params.id]
-    );
-
-    for (const image of imagesResult.rows) {
-      const url = new URL(image.url);
-      const key = url.pathname.substring(1); // bỏ dấu '/'
-      await s3Client.send(
-        new DeleteObjectCommand({
-          Bucket: process.env.SPACES_BUCKET,
-          Key: key,
-        })
+      const imagesResult = await client.query(
+        'SELECT url FROM images WHERE folder_id = $1',
+        [req.params.id]
       );
+
+      for (const image of imagesResult.rows) {
+        const url = new URL(image.url);
+        const key = url.pathname.substring(1);
+        await s3Client.send(
+          new DeleteObjectCommand({
+            Bucket: process.env.SPACES_BUCKET,
+            Key: key,
+          })
+        );
+      }
+
+      await client.query('DELETE FROM folders WHERE id = $1', [req.params.id]);
+      await client.query('COMMIT');
+      res.sendStatus(204);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Delete Folder Error:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      client.release();
     }
-
-    await client.query('DELETE FROM folders WHERE id = $1', [req.params.id]);
-    await client.query('COMMIT');
-    res.sendStatus(204);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Delete Folder Error:', error);
-    res.status(500).json({ error: error.message });
-  } finally {
-    client.release();
   }
-});
+);
 
-// Gán 1 user được quyền truy cập folder (ADMIN)
+// Gán user vào folder (ADMIN)
 app.post(
   '/api/folders/assign',
   authenticateToken,
@@ -323,20 +325,29 @@ app.post(
   }
 );
 
-// --- DATA CHO USER ĐÃ ĐĂNG NHẬP ---
+// ---------- DATA CHO USER ĐÃ LOGIN ----------
 
-// Lấy danh sách folder mà user được gán
+// Folders mà user hiện tại được gán (dùng cho sidebar "Folders")
 app.get(
   '/api/users/:userId/folders',
   authenticateToken,
   async (req, res) => {
-    if (req.user.id !== req.params.userId && req.user.role !== 'ADMIN') {
+    const requestedUserId = req.params.userId;
+    const currentUser = req.user; // { id, username, role }
+
+    // Nếu không phải ADMIN thì chỉ xem được folder của chính mình
+    if (currentUser.role !== 'ADMIN' && currentUser.id !== requestedUserId) {
       return res.status(403).send('Forbidden');
     }
+
     try {
       const result = await pool.query(
-        'SELECT f.* FROM folders f JOIN folder_assignments fa ON f.id = fa.folder_id WHERE fa.user_id = $1 ORDER BY f.name ASC',
-        [req.params.userId]
+        `SELECT f.*
+         FROM folders f
+         JOIN folder_assignments fa ON f.id = fa.folder_id
+         WHERE fa.user_id = $1
+         ORDER BY f.name ASC`,
+        [requestedUserId]
       );
       res.json(result.rows);
     } catch (error) {
@@ -346,7 +357,7 @@ app.get(
   }
 );
 
-// Lấy ảnh trong 1 folder (check quyền)
+// Các ảnh trong 1 folder – có check quyền nếu không phải ADMIN
 app.get(
   '/api/folders/:folderId/images',
   authenticateToken,
@@ -361,12 +372,21 @@ app.get(
           [userId, folderId]
         );
         if (accessCheck.rows.length === 0) {
-          return res.status(403).json({ error: 'Access denied to this folder' });
+          return res
+            .status(403)
+            .json({ error: 'Access denied to this folder' });
         }
       }
 
       const result = await pool.query(
-        'SELECT id, name, url, uploaded_at as "uploadedAt", url as "displayUrl" FROM images WHERE folder_id = $1 ORDER BY "uploadedAt" DESC',
+        `SELECT id,
+                name,
+                url,
+                uploaded_at AS "uploadedAt",
+                url AS "displayUrl"
+         FROM images
+         WHERE folder_id = $1
+         ORDER BY "uploadedAt" DESC`,
         [folderId]
       );
       res.json(result.rows);
@@ -377,17 +397,14 @@ app.get(
   }
 );
 
-// --- IMAGES ---
+// ---------- IMAGES (UPLOAD / DELETE) ----------
 
-// Upload ảnh lên Spaces + lưu DB
 app.post('/api/upload', authenticateToken, upload, async (req, res) => {
   if (!req.file)
     return res.status(400).json({ error: 'No file uploaded.' });
 
   const { folderId, folderSlug } = req.body;
-  const key = `${folderSlug}/${Date.now().toString()}-${
-    req.file.originalname
-  }`;
+  const key = `${folderSlug}/${Date.now().toString()}-${req.file.originalname}`;
 
   const uploadParams = {
     Bucket: process.env.SPACES_BUCKET,
@@ -414,45 +431,46 @@ app.post('/api/upload', authenticateToken, upload, async (req, res) => {
   }
 });
 
-// Xoá ảnh (DB + Spaces)
-app.delete('/api/images/:id', authenticateToken, async (req, res) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+app.delete(
+  '/api/images/:id',
+  authenticateToken,
+  async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const imageResult = await client.query(
-      'SELECT url FROM images WHERE id = $1',
-      [req.params.id]
-    );
-    if (imageResult.rows.length === 0) {
-      return res.status(404).send('Image not found');
+      const imageResult = await client.query(
+        'SELECT url FROM images WHERE id = $1',
+        [req.params.id]
+      );
+      if (imageResult.rows.length === 0) {
+        return res.status(404).send('Image not found');
+      }
+
+      const url = new URL(imageResult.rows[0].url);
+      const key = url.pathname.substring(1);
+
+      await s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.SPACES_BUCKET,
+          Key: key,
+        })
+      );
+      await client.query('DELETE FROM images WHERE id = $1', [req.params.id]);
+
+      await client.query('COMMIT');
+      res.sendStatus(204);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Delete Image Error:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      client.release();
     }
-
-    const url = new URL(imageResult.rows[0].url);
-    const key = url.pathname.substring(1);
-    await s3Client.send(
-      new DeleteObjectCommand({
-        Bucket: process.env.SPACES_BUCKET,
-        Key: key,
-      })
-    );
-
-    await client.query('DELETE FROM images WHERE id = $1', [
-      req.params.id,
-    ]);
-
-    await client.query('COMMIT');
-    res.sendStatus(204);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Delete Image Error:', error);
-    res.status(500).json({ error: error.message });
-  } finally {
-    client.release();
   }
-});
+);
 
-// --- KHỞI ĐỘNG SERVER ---
+// ---------- START SERVER ----------
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
