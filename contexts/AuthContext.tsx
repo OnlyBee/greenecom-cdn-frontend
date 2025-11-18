@@ -15,19 +15,19 @@ export type User = {
   role: Role;
 };
 
-type AuthContextType = {
+export type AuthContextType = {
   user: User | null;
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 };
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// 👈 QUAN TRỌNG: export AuthContext để những chỗ cũ import { AuthContext } không bị lỗi
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const TOKEN_KEY = 'greenecom_token';
 const USER_KEY = 'greenecom_user';
 
-// Giải mã payload của JWT để lấy userId, role
 type DecodedToken = {
   userId: string;
   role: Role;
@@ -79,7 +79,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error(data?.message || 'Invalid username or password');
     }
 
-    // Backend (server.js) trả về: { token, role, username }
     const tokenFromServer: string = data.token;
     if (!tokenFromServer) {
       throw new Error('No token returned from server');
@@ -120,7 +119,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Hook dùng trong app
 export const useAuthContext = (): AuthContextType => {
   const ctx = useContext(AuthContext);
   if (!ctx) {
