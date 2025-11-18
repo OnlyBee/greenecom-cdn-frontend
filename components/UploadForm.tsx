@@ -60,7 +60,14 @@ const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadS
         if (items[i].type.indexOf('image') !== -1) {
             const blob = items[i].getAsFile();
             if (blob) {
-                setFile(blob);
+                // Sometimes pasted images don't have a name (e.g. 'image.png'), verify it
+                if (!blob.name) {
+                    // Create a new File object with a name if missing
+                    const renamedFile = new File([blob], `pasted-image-${Date.now()}.png`, { type: blob.type });
+                    setFile(renamedFile);
+                } else {
+                    setFile(blob);
+                }
                 setUrlInput('');
                 setError(null);
                 return;
