@@ -24,15 +24,27 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// Fix lỗi Signature: Trim khoảng trắng thừa nếu có trong env vars
+// --- S3 CONFIG (FIXED FOR SGP1) ---
+const spacesRegion = process.env.SPACES_REGION ? process.env.SPACES_REGION.trim() : 'sgp1';
+const spacesBucket = process.env.SPACES_BUCKET ? process.env.SPACES_BUCKET.trim() : 'greene';
+
 const s3Config = {
-  endpoint: `https://${process.env.SPACES_REGION}.digitaloceanspaces.com`,
-  region: process.env.SPACES_REGION ? process.env.SPACES_REGION.trim() : 'us-east-1',
+  // Endpoint phải là: https://sgp1.digitaloceanspaces.com (KHÔNG có tên bucket ở đây)
+  endpoint: `https://${spacesRegion}.digitaloceanspaces.com`,
+  region: spacesRegion,
+  forcePathStyle: false, // False để SDK tự chuyển thành greene.sgp1.digitaloceanspaces.com
   credentials: {
     accessKeyId: process.env.SPACES_KEY ? process.env.SPACES_KEY.trim() : '',
     secretAccessKey: process.env.SPACES_SECRET ? process.env.SPACES_SECRET.trim() : '',
   },
 };
+
+console.log('--- S3 CONFIG DEBUG ---');
+console.log('Region:', s3Config.region);
+console.log('Endpoint:', s3Config.endpoint);
+console.log('Bucket Target:', spacesBucket);
+console.log('Key ID Length:', s3Config.credentials.accessKeyId.length);
+console.log('-----------------------');
 
 const s3Client = new S3Client(s3Config);
 
@@ -185,7 +197,8 @@ app.delete(['/folders/:id', '/api/folders/:id'], authenticateToken, isAdmin, asy
     for (const img of images.rows) {
       try {
         const u = new URL(img.url);
-        await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.SPACES_BUCKET, Key: u.pathname.substring(1) }));
+        // Key là phần path bỏ đi dấu / ở đầu
+        await s3Client.send(new DeleteObjectCommand({ Bucket: spacesBucket, Key: u.pathname.substring(1) }));
       } catch (err) { /* ignore invalid url errors */ }
     }
     await client.query('DELETE FROM folders WHERE id = $1', [req.params.id]);
@@ -209,7 +222,7 @@ app.post(['/folders/assign', '/api/folders/assign'], authenticateToken, isAdmin,
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// UNASSIGN USER (HUỶ QUYỀN)
+// UNASSIGN USER
 app.delete(['/folders/:folderId/users/:userId', '/api/folders/:folderId/users/:userId'], authenticateToken, isAdmin, async (req, res) => {
   const { folderId, userId } = req.params;
   try {
@@ -268,14 +281,17 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
     const slug = folderSlug || 'default';
     const key = `${slug}/${Date.now()}-${safeFilename}`;
     
+    // Upload to DigitalOcean Spaces
     await s3Client.send(new PutObjectCommand({
-      Bucket: process.env.SPACES_BUCKET ? process.env.SPACES_BUCKET.trim() : '',
+      Bucket: spacesBucket,
       Key: key,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
+      ACL: 'public-read' // Thử lại public-read, nếu bucket cấm ACL thì xoá dòng này
     }));
     
-    const fileUrl = `https://${process.env.SPACES_BUCKET}.${process.env.SPACES_REGION}.digitaloceanspaces.com/${key}`;
+    // Tạo URL: https://bucket.region.digitaloceanspaces.com/key
+    const fileUrl = `https://${spacesBucket}.${spacesRegion}.digitaloceanspaces.com/${key}`;
     
     const result = await pool.query(
       'INSERT INTO images (name, url, folder_id) VALUES ($1, $2, $3) RETURNING *',
@@ -283,7 +299,7 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
     );
     res.status(201).json(result.rows[0]);
   } catch (e) { 
-    console.error('Upload Error:', e); 
+    console.error('Upload Error Details:', e); 
     res.status(500).json({ error: e.message || 'Upload failed' }); 
   }
 });
@@ -319,8 +335,9 @@ app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, re
     const imgRes = await client.query('SELECT url FROM images WHERE id = $1', [req.params.id]);
     if (imgRes.rows.length > 0) {
       const u = new URL(imgRes.rows[0].url);
+      // Chỉ xoá trên Spaces nếu URL thuộc về Spaces của mình
       if (u.hostname.includes('digitaloceanspaces.com')) {
-        await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.SPACES_BUCKET, Key: u.pathname.substring(1) }));
+        await s3Client.send(new DeleteObjectCommand({ Bucket: spacesBucket, Key: u.pathname.substring(1) }));
       }
       await client.query('DELETE FROM images WHERE id = $1', [req.params.id]);
     }
