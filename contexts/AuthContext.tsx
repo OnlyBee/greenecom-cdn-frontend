@@ -1,24 +1,16 @@
 // src/contexts/AuthContext.tsx
-
 import React, {
   createContext,
-  useContext,
-  useEffect,
   useState,
+  useContext,
   ReactNode,
+  useEffect,
 } from 'react';
 
-type Role = 'ADMIN' | 'MEMBER' | string;
-
-type User = {
-  username: string;
-  role: Role;
-};
-
 type AuthContextType = {
-  user: User | null;
   token: string | null;
-  loading: boolean;
+  username: string | null;
+  role: string | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 };
@@ -27,96 +19,76 @@ export const AuthContext = createContext<AuthContextType | undefined>(
   undefined
 );
 
-const TOKEN_KEY = 'greenecom_token';
-const USER_KEY = 'greenecom_user';
-
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [username, setUsername] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
 
-  // Load từ localStorage khi mở trang
+  // Lấy token từ localStorage khi load lại trang
   useEffect(() => {
-    const savedToken = localStorage.getItem(TOKEN_KEY);
-    const savedUser = localStorage.getItem(USER_KEY);
+    const storedToken = localStorage.getItem('greenecom_token');
+    const storedUser = localStorage.getItem('greenecom_username');
+    const storedRole = localStorage.getItem('greenecom_role');
 
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
-        setUser(null);
-      }
-    }
-
-    setLoading(false);
+    if (storedToken) setToken(storedToken);
+    if (storedUser) setUsername(storedUser);
+    if (storedRole) setRole(storedRole);
   }, []);
 
-  const login = async (username: string, password: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
+  const login = async (usernameInput: string, password: string) => {
+    // *** QUAN TRỌNG: gọi đúng /api/login ***
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: usernameInput,
+        password,
+      }),
+    });
 
-      if (!res.ok) {
-        // backend có thể trả JSON hoặc text
-        let msg = 'Invalid username or password';
-        try {
-          const data = await res.json();
-          msg = data.message || msg;
-        } catch {
-          const text = await res.text();
-          if (text) msg = text;
-        }
-        throw new Error(msg);
-      }
-
-      // backend: { token, role, username }
-      const data = await res.json();
-
-      if (!data.token) {
-        throw new Error('No token received from server');
-      }
-
-      const userData: User = {
-        username: data.username ?? username,
-        role: data.role ?? 'MEMBER',
-      };
-
-      setToken(data.token);
-      setUser(userData);
-
-      localStorage.setItem(TOKEN_KEY, data.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(userData));
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error('Invalid username or password');
     }
+
+    const data = await response.json();
+    // backend trả: { token, role, username }
+
+    setToken(data.token || null);
+    setUsername(data.username || usernameInput);
+    setRole(data.role || null);
+
+    // Lưu vào localStorage để reload vẫn giữ login
+    localStorage.setItem('greenecom_token', data.token);
+    localStorage.setItem('greenecom_username', data.username || usernameInput);
+    if (data.role) localStorage.setItem('greenecom_role', data.role);
   };
 
   const logout = () => {
-    setUser(null);
     setToken(null);
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    setUsername(null);
+    setRole(null);
+    localStorage.removeItem('greenecom_token');
+    localStorage.removeItem('greenecom_username');
+    localStorage.removeItem('greenecom_role');
   };
 
   const value: AuthContextType = {
-    user,
     token,
-    loading,
+    username,
+    role,
     login,
     logout,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
-// Hook dùng trong app
 export const useAuthContext = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) {
