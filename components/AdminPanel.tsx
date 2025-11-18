@@ -129,18 +129,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
         {/* User Management */}
         <div>
             <h3 className="text-lg font-semibold text-gray-200 mb-2">Users ({memberUsers.length})</h3>
-            <ul className="bg-gray-700/50 rounded-md p-2 max-h-60 overflow-y-auto divide-y divide-gray-600/50">
+            <ul className="bg-gray-700/50 rounded-md p-2 max-h-96 overflow-y-auto divide-y divide-gray-600/50">
                 {memberUsers.map(user => 
-                    <li key={user.id} className="p-2 text-gray-300 flex justify-between items-center">
-                        <span>{user.username}</span>
-                        <button
-                          onClick={() => handleDeleteUser(user.id, user.username)}
-                          className="text-red-400 hover:text-red-300 p-1 rounded-full hover:bg-gray-600"
-                          aria-label={`Delete user ${user.username}`}
-                          title={`Delete user ${user.username}`}
-                        >
-                            <TrashIcon />
-                        </button>
+                    <li key={user.id} className="p-3 flex flex-col space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="font-medium text-white">{user.username}</span>
+                            <button
+                              onClick={() => handleDeleteUser(user.id, user.username)}
+                              className="text-red-400 hover:text-red-300 p-1 rounded-full hover:bg-gray-600"
+                              aria-label={`Delete user ${user.username}`}
+                              title={`Delete user ${user.username}`}
+                            >
+                                <TrashIcon />
+                            </button>
+                        </div>
+                        {/* Assigned Folders Badges */}
+                        <div className="flex flex-wrap gap-1">
+                             {user.assigned_folders && user.assigned_folders.length > 0 ? (
+                                user.assigned_folders.map(f => (
+                                    <span key={f.id} className="px-2 py-0.5 rounded text-xs bg-gray-600 text-gray-200 border border-gray-500">
+                                        📁 {f.name}
+                                    </span>
+                                ))
+                             ) : (
+                                <span className="text-xs text-gray-500 italic">No folders assigned</span>
+                             )}
+                        </div>
                     </li>
                 )}
             </ul>
@@ -149,20 +163,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
         {/* Folder Management */}
         <div>
             <h3 className="text-lg font-semibold text-gray-200 mb-2">Folders ({folders.length})</h3>
-             <ul className="bg-gray-700/50 rounded-md p-2 max-h-60 overflow-y-auto divide-y divide-gray-600/50">
+             <ul className="bg-gray-700/50 rounded-md p-2 max-h-96 overflow-y-auto divide-y divide-gray-600/50">
                 {folders.map(folder => (
-                    <li key={folder.id} className="p-2 text-gray-300 flex justify-between items-center gap-2">
-                        <span className="flex-grow truncate">{folder.name}</span>
-                        <div className="flex-shrink-0 flex items-center gap-2">
-                            <button onClick={() => setAssigningFolder(folder)} className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded">Assign</button>
-                            <button
-                                onClick={() => handleDeleteFolder(folder.id, folder.name)}
-                                className="text-red-400 hover:text-red-300 p-1 rounded-full hover:bg-gray-600"
-                                aria-label={`Delete folder ${folder.name}`}
-                                title={`Delete folder ${folder.name}`}
-                            >
-                                <TrashIcon />
-                            </button>
+                    <li key={folder.id} className="p-3 flex flex-col space-y-2">
+                        <div className="flex justify-between items-center gap-2">
+                            <span className="font-medium text-white truncate">{folder.name}</span>
+                            <div className="flex-shrink-0 flex items-center gap-2">
+                                <button onClick={() => setAssigningFolder(folder)} className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded font-bold">
+                                    + Assign
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteFolder(folder.id, folder.name)}
+                                    className="text-red-400 hover:text-red-300 p-1 rounded-full hover:bg-gray-600"
+                                    aria-label={`Delete folder ${folder.name}`}
+                                    title={`Delete folder ${folder.name}`}
+                                >
+                                    <TrashIcon />
+                                </button>
+                            </div>
+                        </div>
+                         {/* Assigned Users Badges */}
+                        <div className="flex flex-wrap gap-1">
+                            {folder.assigned_users && folder.assigned_users.length > 0 ? (
+                                folder.assigned_users.map(u => (
+                                    <span key={u.id} className="px-2 py-0.5 rounded text-xs bg-blue-900 text-blue-100 border border-blue-700">
+                                        👤 {u.username}
+                                    </span>
+                                ))
+                            ) : (
+                                <span className="text-xs text-gray-500 italic">No users assigned</span>
+                            )}
                         </div>
                     </li>
                 ))}
@@ -198,7 +228,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
         <div className="space-y-4">
             <select value={selectedUserId} onChange={e => setSelectedUserId(e.target.value)} className="w-full bg-gray-700 p-2 rounded text-white">
                 <option value="">Select a user</option>
-                {memberUsers.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                {memberUsers.map(u => {
+                    // Disable if already assigned
+                    const isAssigned = assigningFolder?.assigned_users?.some(au => au.id === u.id);
+                    return (
+                        <option key={u.id} value={u.id} disabled={isAssigned}>
+                            {u.username} {isAssigned ? '(Already assigned)' : ''}
+                        </option>
+                    );
+                })}
             </select>
             {error && <p className="text-red-400 text-sm">{error}</p>}
             <button onClick={handleAssignUser} disabled={loading || !selectedUserId} className="w-full bg-green-600 hover:bg-green-700 text-white p-2 rounded disabled:bg-green-800 disabled:opacity-50">
