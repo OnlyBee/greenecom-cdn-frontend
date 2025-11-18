@@ -3,6 +3,7 @@ import React, {
   useState,
   useContext,
   ReactNode,
+  useEffect,
 } from 'react';
 
 type AuthContextType = {
@@ -18,10 +19,31 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const [token, setToken] = useState<string | null>(null);
+  // Lấy token từ localStorage khi app khởi động
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return localStorage.getItem('authToken');
+    } catch {
+      return null;
+    }
+  });
+
+  // Mỗi khi token thay đổi thì đồng bộ với localStorage
+  useEffect(() => {
+    try {
+      if (token) {
+        localStorage.setItem('authToken', token);
+      } else {
+        localStorage.removeItem('authToken');
+      }
+    } catch {
+      // ignore lỗi localStorage (nếu browser chặn)
+    }
+  }, [token]);
 
   const login = async (username: string, password: string) => {
-    // *** QUAN TRỌNG: GỌI ĐÚNG API BACKEND ***
+    // GỌI ĐÚNG API BACKEND
     const response = await fetch('/api/login', {
       method: 'POST',
       headers: {
@@ -36,7 +58,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
     const data = await response.json();
 
-    // Giả sử backend trả về { token: '...' }
+    // Backend trả về { token: '...' }
     setToken(data.token || null);
   };
 
@@ -57,7 +79,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   );
 };
 
-// Hook tiện cho phía ngoài (anh đang dùng useAuth.ts để wrap lại)
+// Hook tiện cho phía ngoài (useAuth.ts đang wrap lại)
 export const useAuthContext = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) {
