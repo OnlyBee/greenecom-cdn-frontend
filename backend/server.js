@@ -13,6 +13,7 @@ const {
   PutObjectCommand,
 } = require('@aws-sdk/client-s3');
 const { URL } = require('url');
+const path = require('path');
 
 // --- CẤU HÌNH ---
 const app = express();
@@ -27,26 +28,39 @@ const pool = new Pool({
 // --- S3 CONFIG (FIXED FOR SGP1) ---
 const spacesRegion = process.env.SPACES_REGION ? process.env.SPACES_REGION.trim() : 'sgp1';
 const spacesBucket = process.env.SPACES_BUCKET ? process.env.SPACES_BUCKET.trim() : 'greene';
+const spacesEndpoint = process.env.SPACES_ENDPOINT ? process.env.SPACES_ENDPOINT.trim() : `https://${spacesRegion}.digitaloceanspaces.com`;
+
+// --- CDN CONFIG ---
+let cdnBaseUrl = `https://${spacesBucket}.${spacesRegion}.digitaloceanspaces.com`;
+
+if (process.env.CDN_URL) {
+  cdnBaseUrl = process.env.CDN_URL.trim().replace(/\/+$/, '');
+} else if (spacesBucket === 'greene') {
+  cdnBaseUrl = 'https://cdn.greenecom.net';
+}
 
 const s3Config = {
-  // Endpoint phải là: https://sgp1.digitaloceanspaces.com (KHÔNG có tên bucket ở đây)
-  endpoint: `https://${spacesRegion}.digitaloceanspaces.com`,
+  endpoint: spacesEndpoint,
   region: spacesRegion,
-  forcePathStyle: false, // False để SDK tự chuyển thành greene.sgp1.digitaloceanspaces.com
+  forcePathStyle: false, 
   credentials: {
     accessKeyId: process.env.SPACES_KEY ? process.env.SPACES_KEY.trim() : '',
     secretAccessKey: process.env.SPACES_SECRET ? process.env.SPACES_SECRET.trim() : '',
   },
 };
 
-console.log('--- S3 CONFIG DEBUG ---');
-console.log('Region:', s3Config.region);
-console.log('Endpoint:', s3Config.endpoint);
-console.log('Bucket Target:', spacesBucket);
-console.log('Key ID Length:', s3Config.credentials.accessKeyId.length);
-console.log('-----------------------');
-
 const s3Client = new S3Client(s3Config);
+
+// --- HELPER FUNCTIONS ---
+const slugify = (text) => {
+  if (!text) return 'default';
+  return text.toString().toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
+};
 
 // --- MIDDLEWARE ---
 app.use(cors());
@@ -101,7 +115,6 @@ app.post(['/login', '/api/login'], async (req, res) => {
 // 2. Users
 app.get(['/users', '/api/users'], authenticateToken, isAdmin, async (req, res) => {
   try {
-    // Lấy user kèm danh sách các folder được assign
     const query = `
       SELECT 
         u.id, 
@@ -162,7 +175,6 @@ app.put(['/users/change-password', '/api/users/change-password'], authenticateTo
 // 3. Folders
 app.get(['/folders', '/api/folders'], authenticateToken, isAdmin, async (req, res) => {
   try {
-    // Lấy folder kèm danh sách user được assign
     const query = `
       SELECT 
         f.*,
@@ -197,9 +209,8 @@ app.delete(['/folders/:id', '/api/folders/:id'], authenticateToken, isAdmin, asy
     for (const img of images.rows) {
       try {
         const u = new URL(img.url);
-        // Key là phần path bỏ đi dấu / ở đầu
         await s3Client.send(new DeleteObjectCommand({ Bucket: spacesBucket, Key: u.pathname.substring(1) }));
-      } catch (err) { /* ignore invalid url errors */ }
+      } catch (err) { /* ignore */ }
     }
     await client.query('DELETE FROM folders WHERE id = $1', [req.params.id]);
     await client.query('COMMIT');
@@ -210,7 +221,7 @@ app.delete(['/folders/:id', '/api/folders/:id'], authenticateToken, isAdmin, asy
   } finally { client.release(); }
 });
 
-// ASSIGN USER
+// ASSIGN/UNASSIGN
 app.post(['/folders/assign', '/api/folders/assign'], authenticateToken, isAdmin, async (req, res) => {
   const { userId, folderId } = req.body;
   try {
@@ -222,21 +233,15 @@ app.post(['/folders/assign', '/api/folders/assign'], authenticateToken, isAdmin,
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// UNASSIGN USER
 app.delete(['/folders/:folderId/users/:userId', '/api/folders/:folderId/users/:userId'], authenticateToken, isAdmin, async (req, res) => {
   const { folderId, userId } = req.params;
   try {
-    await pool.query(
-      'DELETE FROM folder_assignments WHERE folder_id = $1 AND user_id = $2',
-      [folderId, userId]
-    );
+    await pool.query('DELETE FROM folder_assignments WHERE folder_id = $1 AND user_id = $2', [folderId, userId]);
     res.sendStatus(204);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 4. View Data (Folders/Images)
+// 4. View Data
 app.get(['/users/:userId/folders', '/api/users/:userId/folders'], authenticateToken, async (req, res) => {
   const { userId } = req.params;
   if (req.user.role !== 'ADMIN' && req.user.id !== userId) return res.status(403).send('Forbidden');
@@ -264,7 +269,7 @@ app.get(['/folders/:folderId/images', '/api/folders/:folderId/images'], authenti
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 5. Upload & Delete Images
+// 5. UPLOAD
 
 // Upload File (Multipart)
 app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res) => {
@@ -272,60 +277,92 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
   
   try {
     const { folderId, folderSlug } = req.body;
-    
-    if (!folderId) {
-      return res.status(400).json({ error: 'Folder ID is missing' });
-    }
+    if (!folderId) return res.status(400).json({ error: 'Folder ID missing' });
 
     const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const slug = folderSlug || 'default';
+    // Nếu frontend không gửi slug, query từ DB (nhưng ở đây fallback tạm)
+    let slug = folderSlug || 'default';
+    
     const key = `${slug}/${Date.now()}-${safeFilename}`;
     
-    // Upload to DigitalOcean Spaces
     await s3Client.send(new PutObjectCommand({
       Bucket: spacesBucket,
       Key: key,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
-      ACL: 'public-read' // Thử lại public-read, nếu bucket cấm ACL thì xoá dòng này
     }));
     
-    // Tạo URL: https://bucket.region.digitaloceanspaces.com/key
-    const fileUrl = `https://${spacesBucket}.${spacesRegion}.digitaloceanspaces.com/${key}`;
-    
+    const fileUrl = `${cdnBaseUrl}/${key}`;
     const result = await pool.query(
       'INSERT INTO images (name, url, folder_id) VALUES ($1, $2, $3) RETURNING *',
       [req.file.originalname, fileUrl, folderId]
     );
     res.status(201).json(result.rows[0]);
   } catch (e) { 
-    console.error('Upload Error Details:', e); 
-    res.status(500).json({ error: e.message || 'Upload failed' }); 
+    console.error('Upload File Error:', e);
+    res.status(500).json({ error: e.message, code: e.Code }); 
   }
 });
 
-// Upload URL (JSON)
+// Upload URL (Download -> Re-upload)
 app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res) => {
   const { folderId, imageUrl } = req.body;
   if (!folderId || !imageUrl) return res.status(400).json({ error: 'Missing info' });
 
   try {
-    let fileName = 'image-from-url.jpg';
+    // 1. Lấy tên folder từ DB để tạo slug chuẩn
+    const folderRes = await pool.query('SELECT name FROM folders WHERE id = $1', [folderId]);
+    if (folderRes.rows.length === 0) return res.status(404).json({ error: 'Folder not found' });
+    const folderName = folderRes.rows[0].name;
+    const folderSlug = slugify(folderName);
+
+    // 2. Tải ảnh từ link gốc
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    
+    // Lấy extension từ url hoặc content-type
+    let ext = '.jpg';
+    if (contentType.includes('png')) ext = '.png';
+    else if (contentType.includes('gif')) ext = '.gif';
+    else if (contentType.includes('webp')) ext = '.webp';
+
+    // Tạo tên file
+    let fileName = `image-${Date.now()}${ext}`;
     try {
       const u = new URL(imageUrl);
-      const pathParts = u.pathname.split('/');
-      if (pathParts.length > 0) {
-        const last = pathParts[pathParts.length - 1];
-        if (last) fileName = last.replace(/[^a-zA-Z0-9.-]/g, '_');
-      }
-    } catch (err) {}
+      const parts = u.pathname.split('/');
+      const last = parts[parts.length - 1];
+      if (last && last.includes('.')) fileName = last.replace(/[^a-zA-Z0-9.-]/g, '_');
+      else fileName = `${last || 'image'}-${Date.now()}${ext}`;
+    } catch(e) {}
 
+    const key = `${folderSlug}/${Date.now()}-${fileName}`;
+
+    // 3. Upload lên Spaces
+    await s3Client.send(new PutObjectCommand({
+      Bucket: spacesBucket,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    }));
+
+    // 4. Lưu link CDN vào DB
+    const fileUrl = `${cdnBaseUrl}/${key}`;
+    
     const result = await pool.query(
       'INSERT INTO images (name, url, folder_id) VALUES ($1, $2, $3) RETURNING *',
-      [fileName, imageUrl, folderId]
+      [fileName, fileUrl, folderId]
     );
     res.status(201).json(result.rows[0]);
-  } catch (e) { console.error(e); res.status(500).json({ error: e.message || 'Save URL failed' }); }
+
+  } catch (e) { 
+    console.error('Upload URL Error:', e); 
+    res.status(500).json({ error: e.message || 'Save URL failed' }); 
+  }
 });
 
 app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, res) => {
@@ -335,9 +372,9 @@ app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, re
     const imgRes = await client.query('SELECT url FROM images WHERE id = $1', [req.params.id]);
     if (imgRes.rows.length > 0) {
       const u = new URL(imgRes.rows[0].url);
-      // Chỉ xoá trên Spaces nếu URL thuộc về Spaces của mình
-      if (u.hostname.includes('digitaloceanspaces.com')) {
-        await s3Client.send(new DeleteObjectCommand({ Bucket: spacesBucket, Key: u.pathname.substring(1) }));
+      if (u.hostname.includes('digitaloceanspaces.com') || u.hostname.includes('greenecom.net')) {
+        const key = u.pathname.substring(1);
+        await s3Client.send(new DeleteObjectCommand({ Bucket: spacesBucket, Key: key }));
       }
       await client.query('DELETE FROM images WHERE id = $1', [req.params.id]);
     }
