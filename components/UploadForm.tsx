@@ -1,88 +1,169 @@
-import React, { useState, useRef } from 'react';
-import { api } from '../services/api';
+import React, { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
-interface UploadFormProps {
-  folderId: string;
-  folderName: string;
-  onUploadSuccess: () => void;
-}
+type Folder = {
+  id: string;
+  name: string;
+  slug?: string;
+};
 
-const UploadIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-    </svg>
-);
+type Props = {
+  selectedFolder: Folder | null;
+  onUploaded: () => void; // gọi lại để reload danh sách ảnh sau khi upload
+};
 
-const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadSuccess }) => {
+const UploadForm: React.FC<Props> = ({ selectedFolder, onUploaded }) => {
+  const { token } = useAuth() as any; // tuỳ kiểu anh đang dùng trong AuthContext
+
   const [file, setFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+    const f = e.target.files?.[0] || null;
+    setFile(f);
+    if (f) {
+      setStatus(`Ready to upload: ${f.name}`);
     }
   };
-  
+
+  // Dán ảnh từ clipboard (Ctrl+V) vào vùng upload
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData.files;
+    if (items && items.length > 0) {
+      const imgFile = items[0];
+      if (imgFile.type.startsWith('image/')) {
+        setFile(imgFile);
+        setStatus(`Pasted image: ${imgFile.name}`);
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      setError('Please select a file to upload.');
+
+    if (!selectedFolder) {
+      setStatus('Please select a folder first.');
+      return;
+    }
+
+    if (!file && !imageUrl.trim()) {
+      setStatus('Choose a file, paste an image or enter an image URL.');
       return;
     }
 
     setLoading(true);
-    setError(null);
-    setSuccess(null);
+    setStatus(null);
 
     try {
-      await api.uploadImage(file, folderId, folderName);
-      setSuccess('Image uploaded successfully!');
-      onUploadSuccess();
-      
-      // Reset form
-      setFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      // 1) Nếu có file -> dùng endpoint /api/upload (multipart)
+      if (file) {
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('folderId', selectedFolder.id);
+        // slug nếu DB anh có, nếu không có thì dùng name thường
+        const slug = selectedFolder.slug || selectedFolder.name.toLowerCase().replace(/\s+/g, '-');
+        formData.append('folderSlug', slug);
+
+        const resp = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          throw new Error(data.error || 'Upload failed');
+        }
+
+        setStatus('Uploaded file successfully!');
       }
 
+      // 2) Nếu không có file nhưng có URL -> dùng endpoint /api/upload/url
+      else if (imageUrl.trim()) {
+        const resp = await fetch('/api/upload/url', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            folderId: selectedFolder.id,
+            imageUrl: imageUrl.trim(),
+          }),
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          throw new Error(data.error || 'Upload by URL failed');
+        }
+
+        setStatus('Saved image URL successfully!');
+      }
+
+      // reset & reload list
+      setFile(null);
+      setImageUrl('');
+      onUploaded();
     } catch (err: any) {
-      setError(err.message || 'Upload failed. Please try again.');
+      console.error(err);
+      setStatus(err.message || 'Failed to upload or save image.');
     } finally {
       setLoading(false);
-      setTimeout(() => setSuccess(null), 3000);
     }
   };
 
   return (
-    <div className="bg-gray-700/50 p-6 rounded-lg">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-            <label htmlFor="file-upload" className="block text-sm font-medium text-gray-300 mb-2">
-              Upload from your computer
-            </label>
-            <input 
-                ref={fileInputRef}
-                id="file-upload" 
-                type="file" 
-                onChange={handleFileChange} 
-                accept="image/*" 
-                className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700"
-            />
+    <form onSubmit={handleSubmit}>
+      <div
+        className="rounded-md border border-dashed border-gray-600 p-4 mb-4"
+        onPaste={handlePaste}
+      >
+        <p className="text-sm text-gray-400 mb-2">
+          - Chọn file từ máy, hoặc<br />
+          - Dán trực tiếp ảnh (Ctrl+V), hoặc<br />
+          - Nhập URL ảnh bên dưới.
+        </p>
+
+        <div className="flex items-center gap-2 mb-3">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="text-sm"
+          />
         </div>
-        
-        <div className="pt-2">
-            <button type="submit" disabled={loading || !file} className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-green-500 disabled:bg-green-800 disabled:opacity-50">
-                <UploadIcon/>
-                {loading ? 'Uploading...' : 'Upload Image'}
-            </button>
+
+        <div className="mb-3">
+          <input
+            type="text"
+            placeholder="Hoặc nhập link ảnh (https://...)"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            className="w-full rounded-md bg-gray-800 border border-gray-600 px-3 py-2 text-sm text-gray-100"
+          />
         </div>
-      </form>
-      {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
-      {success && <p className="mt-4 text-sm text-green-400">{success}</p>}
-    </div>
+
+        {status && (
+          <p className="text-sm mt-1 text-red-400">
+            {status}
+          </p>
+        )}
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading || !selectedFolder}
+        className="px-4 py-2 rounded-md bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {loading ? 'Uploading...' : 'Upload Image'}
+      </button>
+    </form>
   );
 };
 
