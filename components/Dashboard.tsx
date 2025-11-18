@@ -10,6 +10,7 @@ import FolderList from './FolderList';
 import { api } from '../services/api';
 
 const Dashboard: React.FC = () => {
+  const { logout } = useAuth();
   const { user } = useAuth();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [images, setImages] = useState<ImageFile[]>([]);
