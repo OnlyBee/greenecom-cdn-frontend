@@ -33,6 +33,7 @@ const spacesEndpoint = process.env.SPACES_ENDPOINT ? process.env.SPACES_ENDPOINT
 // --- CDN CONFIG ---
 let cdnBaseUrl = `https://${spacesBucket}.${spacesRegion}.digitaloceanspaces.com`;
 
+// Ưu tiên CDN_URL từ env, nếu không có và bucket là 'greene' thì dùng domain riêng
 if (process.env.CDN_URL) {
   cdnBaseUrl = process.env.CDN_URL.trim().replace(/\/+$/, '');
 } else if (spacesBucket === 'greene') {
@@ -280,8 +281,12 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
     if (!folderId) return res.status(400).json({ error: 'Folder ID missing' });
 
     const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    // Nếu frontend không gửi slug, query từ DB (nhưng ở đây fallback tạm)
-    let slug = folderSlug || 'default';
+    // Nếu frontend không gửi slug, query từ DB
+    let slug = folderSlug;
+    if (!slug) {
+         const fRes = await pool.query('SELECT name FROM folders WHERE id = $1', [folderId]);
+         slug = fRes.rows.length > 0 ? slugify(fRes.rows[0].name) : 'default';
+    }
     
     const key = `${slug}/${Date.now()}-${safeFilename}`;
     
@@ -290,6 +295,7 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
       Key: key,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
+      // ACL: 'public-read' // Đã bỏ để tránh lỗi 500 AccessDenied
     }));
     
     const fileUrl = `${cdnBaseUrl}/${key}`;
@@ -320,9 +326,13 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
     const response = await fetch(imageUrl);
     if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
     
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.startsWith('image/')) {
+        return res.status(400).json({ error: 'URL does not point to a valid image (content-type mismatch)' });
+    }
+
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
     
     // Lấy extension từ url hoặc content-type
     let ext = '.jpg';
@@ -336,8 +346,12 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
       const u = new URL(imageUrl);
       const parts = u.pathname.split('/');
       const last = parts[parts.length - 1];
-      if (last && last.includes('.')) fileName = last.replace(/[^a-zA-Z0-9.-]/g, '_');
-      else fileName = `${last || 'image'}-${Date.now()}${ext}`;
+      // Lọc tên file sạch sẽ
+      if (last && last.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+          fileName = last.replace(/[^a-zA-Z0-9.-]/g, '_');
+      } else {
+          fileName = `${last.replace(/[^a-zA-Z0-9.-]/g, '_')}-${Date.now()}${ext}`;
+      }
     } catch(e) {}
 
     const key = `${folderSlug}/${Date.now()}-${fileName}`;
