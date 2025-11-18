@@ -10,6 +10,7 @@ import FolderList from './FolderList';
 import { api } from '../services/api';
 
 const Dashboard: React.FC = () => {
+  const { logout } = useAuth();
   const { user } = useAuth();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [images, setImages] = useState<ImageFile[]>([]);
@@ -101,7 +102,6 @@ const Dashboard: React.FC = () => {
   };
 
   const currentFolderName = folders.find(f => f.id === selectedFolder)?.name || 'Select a folder';
-  const currentFolderObject = folders.find(f => f.id === selectedFolder) || null;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -112,6 +112,9 @@ const Dashboard: React.FC = () => {
             <AdminPanel users={allUsers} folders={allFolders} onUpdate={handleDataUpdate} />
           )}
 
+
+
+          
           <div className="mt-8 grid grid-cols-1 md:grid-cols-12 gap-8">
             <div className="md:col-span-3">
                 <h2 className="text-xl font-bold mb-4 text-white">Folders</h2>
@@ -141,8 +144,9 @@ const Dashboard: React.FC = () => {
                         {currentFolderName}
                     </h2>
                     <UploadForm 
-                        selectedFolder={currentFolderObject}
-                        onUploaded={handleUploadSuccess} 
+                        folderId={selectedFolder!} 
+                        folderName={currentFolderName}
+                        onUploadSuccess={handleUploadSuccess} 
                     />
                     <div className="mt-8 border-t border-gray-700 pt-8">
                         <h3 className="text-xl font-semibold mb-4 text-white">Images</h3>
