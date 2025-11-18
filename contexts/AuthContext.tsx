@@ -46,16 +46,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  // LOGIN: gọi đúng /login, nhận { accessToken, user }
+  // LOGIN: gọi đúng /api/login, nhận { accessToken, user }
   const login = async (username: string, password: string) => {
     const res = await fetch('/api/login', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({ username, password }),
-});
-
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -69,7 +62,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const data = await res.json();
 
-    // Lưu token dưới cả hai key cho chắc (accessToken & token)
     const token = data.accessToken || data.token;
     if (!token) throw new Error('No token returned from server');
 
@@ -80,7 +72,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);
     } else {
-      // fallback nếu backend chưa trả user (hiện tại có rồi)
       setUser(null);
     }
   };
