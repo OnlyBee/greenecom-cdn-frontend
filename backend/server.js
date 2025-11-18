@@ -24,14 +24,17 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const s3Client = new S3Client({
+// Fix lỗi Signature: Trim khoảng trắng thừa nếu có trong env vars
+const s3Config = {
   endpoint: `https://${process.env.SPACES_REGION}.digitaloceanspaces.com`,
-  region: process.env.SPACES_REGION,
+  region: process.env.SPACES_REGION ? process.env.SPACES_REGION.trim() : 'us-east-1',
   credentials: {
-    accessKeyId: process.env.SPACES_KEY,
-    secretAccessKey: process.env.SPACES_SECRET,
+    accessKeyId: process.env.SPACES_KEY ? process.env.SPACES_KEY.trim() : '',
+    secretAccessKey: process.env.SPACES_SECRET ? process.env.SPACES_SECRET.trim() : '',
   },
-});
+};
+
+const s3Client = new S3Client(s3Config);
 
 // --- MIDDLEWARE ---
 app.use(cors());
@@ -194,6 +197,7 @@ app.delete(['/folders/:id', '/api/folders/:id'], authenticateToken, isAdmin, asy
   } finally { client.release(); }
 });
 
+// ASSIGN USER
 app.post(['/folders/assign', '/api/folders/assign'], authenticateToken, isAdmin, async (req, res) => {
   const { userId, folderId } = req.body;
   try {
@@ -203,6 +207,20 @@ app.post(['/folders/assign', '/api/folders/assign'], authenticateToken, isAdmin,
     );
     res.status(200).json({ success: true, message: 'Assigned successfully' });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// UNASSIGN USER (HUỶ QUYỀN)
+app.delete(['/folders/:folderId/users/:userId', '/api/folders/:folderId/users/:userId'], authenticateToken, isAdmin, async (req, res) => {
+  const { folderId, userId } = req.params;
+  try {
+    await pool.query(
+      'DELETE FROM folder_assignments WHERE folder_id = $1 AND user_id = $2',
+      [folderId, userId]
+    );
+    res.sendStatus(204);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // 4. View Data (Folders/Images)
@@ -246,14 +264,12 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
       return res.status(400).json({ error: 'Folder ID is missing' });
     }
 
-    // Sanitize filename to prevent issues with spaces/unicode in S3 Keys
     const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
     const slug = folderSlug || 'default';
     const key = `${slug}/${Date.now()}-${safeFilename}`;
     
-    // REMOVED: ACL: 'public-read' to fix potential 500 errors on buckets that disable ACLs.
     await s3Client.send(new PutObjectCommand({
-      Bucket: process.env.SPACES_BUCKET,
+      Bucket: process.env.SPACES_BUCKET ? process.env.SPACES_BUCKET.trim() : '',
       Key: key,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
@@ -268,7 +284,6 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
     res.status(201).json(result.rows[0]);
   } catch (e) { 
     console.error('Upload Error:', e); 
-    // Return specific error message for debugging
     res.status(500).json({ error: e.message || 'Upload failed' }); 
   }
 });
@@ -285,7 +300,6 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
       const pathParts = u.pathname.split('/');
       if (pathParts.length > 0) {
         const last = pathParts[pathParts.length - 1];
-        // Sanitize
         if (last) fileName = last.replace(/[^a-zA-Z0-9.-]/g, '_');
       }
     } catch (err) {}
