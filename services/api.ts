@@ -4,7 +4,7 @@ import type { User, Folder, ImageFile } from '../types';
 const API_BASE_URL = '/api';
 
 // --- Helper Functions ---
-const getToken = () => localStorage.getItem('accessToken');
+const getToken = () => localStorage.getItem('greenecom_token');
 
 const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
   const headers: HeadersInit = {
@@ -18,7 +18,10 @@ const request = async <T>(url: string, options: RequestInit = {}): Promise<T> =>
     headers['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(`${API_BASE_URL}${url}`, {
+  // Ensure we don't double slash if url starts with /
+  const endpoint = url.startsWith('/') ? url : `/${url}`;
+  
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
   });
@@ -51,6 +54,7 @@ const slugify = (text: string) => {
 // --- API Functions ---
 export const api = {
   async login(username: string, password: string): Promise<User> {
+    // Login is special, handled in context usually, but keeping here for consistency
     const response = await fetch(`${API_BASE_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -58,7 +62,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Invalid credentials');
     const data = await response.json();
-    localStorage.setItem('accessToken', data.accessToken);
+    // Note: Token storage is usually handled by AuthContext, but this function returns user
     return data.user;
   },
 
