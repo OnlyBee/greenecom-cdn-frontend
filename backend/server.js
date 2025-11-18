@@ -99,7 +99,7 @@ function isAdmin(req, res, next) {
 
 // AUTH
 // ROUTE ĐĂNG NHẬP
-app.post('/login', async (req, res) => {
+app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
