@@ -47,34 +47,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   // LOGIN: gọi đúng /api/login, nhận { accessToken, user }
-  const login = async (username: string, password: string) => {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-    });
+const login = async (username: string, password: string) => {
+  const res = await fetch('/api/login', {    // <-- phải là /api/login
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, password }),
+  });
 
-    if (!res.ok) {
-      throw new Error('Invalid username or password');
-    }
+  if (!res.ok) {
+    throw new Error('Invalid username or password');
+  }
 
-    const data = await res.json();
+  const data = await res.json();
 
-    const token = data.accessToken || data.token;
-    if (!token) throw new Error('No token returned from server');
+  const token = data.accessToken || data.token;
+  if (!token) throw new Error('No token returned from server');
 
-    localStorage.setItem('accessToken', token);
-    localStorage.setItem('token', token);
+  localStorage.setItem('accessToken', token);
+  localStorage.setItem('token', token);
 
-    if (data.user) {
-      localStorage.setItem('user', JSON.stringify(data.user));
-      setUser(data.user);
-    } else {
-      setUser(null);
-    }
-  };
+  if (data.user) {
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+  } else {
+    setUser(null);
+  }
+};
+
 
   const logout = () => {
     setUser(null);
