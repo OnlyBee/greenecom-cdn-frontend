@@ -1,4 +1,3 @@
-
 // Import các thư viện cần thiết
 require('dotenv').config();
 const express = require('express');
@@ -7,26 +6,92 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const multer = require('multer');
-const { S3Client, DeleteObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
+const {
+  S3Client,
+  DeleteObjectCommand,
+  PutObjectCommand,
+} = require('@aws-sdk/client-s3');
 const { URL } = require('url');
 
-// --- CẤU HÌNH ---
+// --- CẤU HÌNH CƠ BẢN ---
 
 const app = express();
-// DEBUG ROUTE - KIỂM TRA DB ĐANG DÙNG
+const PORT = process.env.PORT || 8080;
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// Kết nối Database (Postgres bằng URL) - có SSL cho DigitalOcean
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
+
+// Kết nối DigitalOcean Spaces (S3-compatible)
+const s3Client = new S3Client({
+  endpoint: `https://${process.env.SPACES_REGION}.digitaloceanspaces.com`,
+  region: process.env.SPACES_REGION,
+  credentials: {
+    accessKeyId: process.env.SPACES_KEY,
+    secretAccessKey: process.env.SPACES_SECRET,
+  },
+});
+
+// Middleware chung
+app.use(cors());
+app.use(express.json());
+
+// Cấu hình Multer để xử lý upload file vào bộ nhớ tạm
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage }).single('image');
+
+// --- MIDDLEWARE XÁC THỰC ---
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // "Bearer xxx"
+
+  if (!token) {
+    return res.sendStatus(401);
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      console.error('JWT verify error:', err);
+      return res.sendStatus(403);
+    }
+    // user: { id, username, role, iat, exp }
+    req.user = user;
+    next();
+  });
+}
+
+function isAdmin(req, res, next) {
+  if (!req.user || req.user.role !== 'ADMIN') {
+    return res.status(403).send('Access denied. Admins only.');
+  }
+  next();
+}
+
+// --- DEBUG ROUTES (chỉ dùng để kiểm tra) ---
+
+// Xem danh sách user + DB URL đang dùng
 app.get('/debug/users', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, role, password_hash FROM users');
+    const result = await pool.query(
+      'SELECT id, username, role, password_hash FROM users'
+    );
     res.json({
       db_url: process.env.DATABASE_URL,
-      users: result.rows
+      users: result.rows,
     });
   } catch (err) {
+    console.error(err);
     res.json({ error: err.message });
   }
 });
 
-// DEBUG ROUTE - RESET LẠI MẬT KHẨU ADMIN VỀ 'Rinnguyen@123'
+// Reset mật khẩu admin về 'Rinnguyen@123'
 app.get('/debug/reset-admin', async (req, res) => {
   try {
     const password = 'Rinnguyen@123';
@@ -45,66 +110,17 @@ app.get('/debug/reset-admin', async (req, res) => {
   }
 });
 
+// --- AUTH: LOGIN ---
 
-const PORT = process.env.PORT || 8080;
-const JWT_SECRET = process.env.JWT_SECRET;
-
-// Kết nối Database (Postgres bằng URL) - có SSL cho DigitalOcean
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
-});
-
-
-// Kết nối DigitalOcean Spaces (S3-compatible)
-const s3Client = new S3Client({
-  endpoint: `https://${process.env.SPACES_REGION}.digitaloceanspaces.com`,
-  region: process.env.SPACES_REGION,
-  credentials: {
-    accessKeyId: process.env.SPACES_KEY,
-    secretAccessKey: process.env.SPACES_SECRET,
-  },
-});
-
-// Cấu hình Middleware
-app.use(cors());
-app.use(express.json());
-
-// Cấu hình Multer để xử lý upload file vào bộ nhớ tạm
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage }).single('image');
-
-// --- LOGIC XÁC THỰC (MIDDLEWARE) ---
-
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (token == null) return res.sendStatus(401);
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-}
-
-function isAdmin(req, res, next) {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).send('Access denied. Admins only.');
-  }
-  next();
-}
-
-// AUTH
-// ROUTE ĐĂNG NHẬP
-app.post('/api/login', async (req, res) => {
+// Dùng chung 1 handler cho cả /login và /api/login
+async function loginHandler(req, res) {
   try {
     const { username, password } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ message: 'Username and password are required' });
+      return res
+        .status(400)
+        .json({ message: 'Username and password are required' });
     }
 
     // Lấy user từ DB
@@ -125,14 +141,13 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
-    // Tạo JWT: LƯU Ý dùng "id" chứ không phải "userId"
+    // Tạo JWT – payload chứa id + username + role
     const accessToken = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // Format trả về chuẩn cho frontend
     return res.json({
       accessToken,
       user: {
@@ -145,217 +160,296 @@ app.post('/api/login', async (req, res) => {
     console.error('Login error:', err);
     return res.status(500).json({ message: 'Internal server error' });
   }
-});
+}
 
+// Map cả hai URL để an toàn (tùy DO route thế nào cũng chạy được)
+app.post('/login', loginHandler);
+app.post('/api/login', loginHandler);
 
+// --- USERS ---
 
-// USERS
+// Lấy toàn bộ user (ADMIN)
 app.get('/api/users', authenticateToken, isAdmin, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT id, username, role FROM users');
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Get All Users Error:', error);
-        res.status(500).json({ error: error.message });
-    }
+  try {
+    const result = await pool.query('SELECT id, username, role FROM users');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get All Users Error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
+// Tạo user mới (mặc định role MEMBER)
 app.post('/api/users', authenticateToken, isAdmin, async (req, res) => {
-    const { username, password } = req.body;
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const result = await pool.query(
-            'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role',
-            [username, hashedPassword, 'MEMBER']
-        );
-        res.status(201).json(result.rows[0]);
-    } catch (error) {
-        console.error('Create User Error:', error);
-        res.status(500).json({ error: error.message });
-    }
+  const { username, password } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role',
+      [username, hashedPassword, 'MEMBER']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Create User Error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
+// Đổi mật khẩu cho user hiện tại
 app.put('/api/users/change-password', authenticateToken, async (req, res) => {
-    const { currentPassword, newPassword } = req.body;
-    const userId = req.user.id;
-    try {
-        const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
-        const user = result.rows[0];
-        if (!user) return res.status(404).json({ error: 'User not found' });
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user.id;
 
-        const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
-        if (!isMatch) return res.status(400).json({ error: 'Incorrect current password' });
+  try {
+    const result = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [userId]
+    );
+    const user = result.rows[0];
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
-        const newHashedPassword = await bcrypt.hash(newPassword, 10);
-        await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHashedPassword, userId]);
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isMatch)
+      return res.status(400).json({ error: 'Incorrect current password' });
 
-        res.status(200).json({ message: 'Password updated successfully' });
-    } catch (error) {
-        console.error('Change Password Error:', error);
-        res.status(500).json({ error: error.message });
-    }
+    const newHashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [
+      newHashedPassword,
+      userId,
+    ]);
+
+    res.status(200).json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Change Password Error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
-
+// Xoá user (không xoá ADMIN)
 app.delete('/api/users/:id', authenticateToken, isAdmin, async (req, res) => {
-    try {
-        await pool.query('DELETE FROM users WHERE id = $1 AND role != $2', [req.params.id, 'ADMIN']);
-        res.sendStatus(204);
-    } catch (error) {
-        console.error('Delete User Error:', error);
-        res.status(500).json({ error: error.message });
-    }
+  try {
+    await pool.query(
+      'DELETE FROM users WHERE id = $1 AND role != $2',
+      [req.params.id, 'ADMIN']
+    );
+    res.sendStatus(204);
+  } catch (error) {
+    console.error('Delete User Error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// FOLDERS
+// --- FOLDERS ---
+
+// Lấy toàn bộ folder (ADMIN)
 app.get('/api/folders', authenticateToken, isAdmin, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM folders ORDER BY name ASC');
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Get All Folders Error:', error);
-        res.status(500).json({ error: error.message });
-    }
+  try {
+    const result = await pool.query(
+      'SELECT * FROM folders ORDER BY name ASC'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get All Folders Error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
+// Tạo folder mới (ADMIN)
 app.post('/api/folders', authenticateToken, isAdmin, async (req, res) => {
-    const { name } = req.body;
-    try {
-        const result = await pool.query('INSERT INTO folders (name) VALUES ($1) RETURNING *', [name]);
-        res.status(201).json(result.rows[0]);
-    } catch (error) {
-        console.error('Create Folder Error:', error);
-        res.status(500).json({ error: error.message });
-    }
+  const { name } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO folders (name) VALUES ($1) RETURNING *',
+      [name]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Create Folder Error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
+// Xoá folder + xoá ảnh trong folder (ADMIN)
 app.delete('/api/folders/:id', authenticateToken, isAdmin, async (req, res) => {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        const imagesResult = await client.query('SELECT url FROM images WHERE folder_id = $1', [req.params.id]);
-        for (const image of imagesResult.rows) {
-            const url = new URL(image.url);
-            const key = url.pathname.substring(1);
-            await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.SPACES_BUCKET, Key: key }));
-        }
-        await client.query('DELETE FROM folders WHERE id = $1', [req.params.id]);
-        await client.query('COMMIT');
-        res.sendStatus(204);
-    } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Delete Folder Error:', error);
-        res.status(500).json({ error: error.message });
-    } finally {
-        client.release();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const imagesResult = await client.query(
+      'SELECT url FROM images WHERE folder_id = $1',
+      [req.params.id]
+    );
+
+    for (const image of imagesResult.rows) {
+      const url = new URL(image.url);
+      const key = url.pathname.substring(1); // bỏ dấu '/'
+      await s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.SPACES_BUCKET,
+          Key: key,
+        })
+      );
     }
+
+    await client.query('DELETE FROM folders WHERE id = $1', [req.params.id]);
+    await client.query('COMMIT');
+    res.sendStatus(204);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Delete Folder Error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
 });
 
-app.post('/api/folders/assign', authenticateToken, isAdmin, async (req, res) => {
+// Gán 1 user được quyền truy cập folder (ADMIN)
+app.post(
+  '/api/folders/assign',
+  authenticateToken,
+  isAdmin,
+  async (req, res) => {
     const { userId, folderId } = req.body;
     try {
-        await pool.query('INSERT INTO folder_assignments (user_id, folder_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, folderId]);
-        res.sendStatus(200);
+      await pool.query(
+        'INSERT INTO folder_assignments (user_id, folder_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [userId, folderId]
+      );
+      res.sendStatus(200);
     } catch (error) {
-        console.error('Assign User Error:', error);
-        res.status(500).json({ error: error.message });
+      console.error('Assign User Error:', error);
+      res.status(500).json({ error: error.message });
     }
-});
+  }
+);
 
-// DATA FOR LOGGED IN USERS
-app.get('/api/users/:userId/folders', authenticateToken, async (req, res) => {
+// --- DATA CHO USER ĐÃ ĐĂNG NHẬP ---
+
+// Lấy danh sách folder mà user được gán
+app.get(
+  '/api/users/:userId/folders',
+  authenticateToken,
+  async (req, res) => {
     if (req.user.id !== req.params.userId && req.user.role !== 'ADMIN') {
-        return res.status(403).send('Forbidden');
+      return res.status(403).send('Forbidden');
     }
     try {
-        const result = await pool.query(
-            'SELECT f.* FROM folders f JOIN folder_assignments fa ON f.id = fa.folder_id WHERE fa.user_id = $1 ORDER BY f.name ASC',
-            [req.params.userId]
-        );
-        res.json(result.rows);
+      const result = await pool.query(
+        'SELECT f.* FROM folders f JOIN folder_assignments fa ON f.id = fa.folder_id WHERE fa.user_id = $1 ORDER BY f.name ASC',
+        [req.params.userId]
+      );
+      res.json(result.rows);
     } catch (error) {
-        console.error('Get User Folders Error:', error);
-        res.status(500).json({ error: error.message });
+      console.error('Get User Folders Error:', error);
+      res.status(500).json({ error: error.message });
     }
-});
+  }
+);
 
-app.get('/api/folders/:folderId/images', authenticateToken, async (req, res) => {
+// Lấy ảnh trong 1 folder (check quyền)
+app.get(
+  '/api/folders/:folderId/images',
+  authenticateToken,
+  async (req, res) => {
     const { folderId } = req.params;
     const { id: userId, role } = req.user;
 
     try {
-        if (role !== 'ADMIN') {
-            const accessCheck = await pool.query(
-                'SELECT 1 FROM folder_assignments WHERE user_id = $1 AND folder_id = $2',
-                [userId, folderId]
-            );
-            if (accessCheck.rows.length === 0) {
-                return res.status(403).json({ error: 'Access denied to this folder' });
-            }
-        }
-
-        const result = await pool.query(
-            "SELECT id, name, url, uploaded_at as \"uploadedAt\", url as \"displayUrl\" FROM images WHERE folder_id = $1 ORDER BY \"uploadedAt\" DESC", 
-            [folderId]
+      if (role !== 'ADMIN') {
+        const accessCheck = await pool.query(
+          'SELECT 1 FROM folder_assignments WHERE user_id = $1 AND folder_id = $2',
+          [userId, folderId]
         );
-        res.json(result.rows);
-    } catch (error) { 
-        console.error('Get Images in Folder Error:', error);
-        res.status(500).json({ error: error.message }); 
+        if (accessCheck.rows.length === 0) {
+          return res.status(403).json({ error: 'Access denied to this folder' });
+        }
+      }
+
+      const result = await pool.query(
+        'SELECT id, name, url, uploaded_at as "uploadedAt", url as "displayUrl" FROM images WHERE folder_id = $1 ORDER BY "uploadedAt" DESC',
+        [folderId]
+      );
+      res.json(result.rows);
+    } catch (error) {
+      console.error('Get Images in Folder Error:', error);
+      res.status(500).json({ error: error.message });
     }
+  }
+);
+
+// --- IMAGES ---
+
+// Upload ảnh lên Spaces + lưu DB
+app.post('/api/upload', authenticateToken, upload, async (req, res) => {
+  if (!req.file)
+    return res.status(400).json({ error: 'No file uploaded.' });
+
+  const { folderId, folderSlug } = req.body;
+  const key = `${folderSlug}/${Date.now().toString()}-${
+    req.file.originalname
+  }`;
+
+  const uploadParams = {
+    Bucket: process.env.SPACES_BUCKET,
+    Key: key,
+    Body: req.file.buffer,
+    ACL: 'public-read',
+    ContentType: req.file.mimetype,
+  };
+
+  try {
+    await s3Client.send(new PutObjectCommand(uploadParams));
+
+    const fileUrl = `https://${process.env.SPACES_BUCKET}.${process.env.SPACES_REGION}.digitaloceanspaces.com/${key}`;
+
+    const result = await pool.query(
+      'INSERT INTO images (name, url, folder_id) VALUES ($1, $2, $3) RETURNING *',
+      [req.file.originalname, fileUrl, folderId]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Upload or DB Error:', err);
+    res.status(500).json({ error: 'Failed to upload or save image.' });
+  }
 });
 
-// IMAGES
-app.post('/api/upload', authenticateToken, upload, async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
-    
-    const { folderId, folderSlug } = req.body;
-    const key = `${folderSlug}/${Date.now().toString()}-${req.file.originalname}`;
+// Xoá ảnh (DB + Spaces)
+app.delete('/api/images/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-    const uploadParams = {
+    const imageResult = await client.query(
+      'SELECT url FROM images WHERE id = $1',
+      [req.params.id]
+    );
+    if (imageResult.rows.length === 0) {
+      return res.status(404).send('Image not found');
+    }
+
+    const url = new URL(imageResult.rows[0].url);
+    const key = url.pathname.substring(1);
+    await s3Client.send(
+      new DeleteObjectCommand({
         Bucket: process.env.SPACES_BUCKET,
         Key: key,
-        Body: req.file.buffer,
-        ACL: 'public-read',
-        ContentType: req.file.mimetype,
-    };
+      })
+    );
 
-    try {
-        await s3Client.send(new PutObjectCommand(uploadParams));
-        const fileUrl = `https://${process.env.SPACES_BUCKET}.${process.env.SPACES_REGION}.digitaloceanspaces.com/${key}`;
+    await client.query('DELETE FROM images WHERE id = $1', [
+      req.params.id,
+    ]);
 
-        const result = await pool.query(
-            'INSERT INTO images (name, url, folder_id) VALUES ($1, $2, $3) RETURNING *',
-            [req.file.originalname, fileUrl, folderId]
-        );
-        res.status(201).json(result.rows[0]);
-    } catch (err) {
-        console.error("Upload or DB Error:", err);
-        res.status(500).json({ error: 'Failed to upload or save image.' });
-    }
-});
-
-app.delete('/api/images/:id', authenticateToken, async (req, res) => {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        const imageResult = await client.query('SELECT url FROM images WHERE id = $1', [req.params.id]);
-        if (imageResult.rows.length === 0) {
-            return res.status(404).send('Image not found');
-        }
-        const url = new URL(imageResult.rows[0].url);
-        const key = url.pathname.substring(1);
-        await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.SPACES_BUCKET, Key: key }));
-        await client.query('DELETE FROM images WHERE id = $1', [req.params.id]);
-        await client.query('COMMIT');
-        res.sendStatus(204);
-    } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Delete Image Error:', error);
-        res.status(500).json({ error: error.message });
-    } finally {
-        client.release();
-    }
+    await client.query('COMMIT');
+    res.sendStatus(204);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Delete Image Error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
 });
 
 // --- KHỞI ĐỘNG SERVER ---
