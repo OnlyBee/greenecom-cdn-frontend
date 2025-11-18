@@ -1,89 +1,54 @@
-import React, {
-  createContext,
-  useState,
-  useContext,
-  ReactNode,
-  useEffect,
-} from 'react';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import type { User } from '../types';
+import { api } from '../services/api';
 
-type AuthContextType = {
-  token: string | null;
+interface AuthContextType {
+  user: User | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-};
+  loading: boolean;
+}
 
-export const AuthContext = createContext<AuthContextType | undefined>(
-  undefined
-);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
-  // Lấy token từ localStorage khi app khởi động
-  const [token, setToken] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      return localStorage.getItem('authToken');
-    } catch {
-      return null;
-    }
-  });
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mỗi khi token thay đổi thì đồng bộ với localStorage
+  // Lấy user + accessToken từ localStorage khi load lại trang
   useEffect(() => {
+    setLoading(true);
     try {
-      if (token) {
-        localStorage.setItem('authToken', token);
-      } else {
-        localStorage.removeItem('authToken');
+      const storedUser = localStorage.getItem('user');
+      const token = localStorage.getItem('accessToken');
+
+      if (storedUser && token) {
+        setUser(JSON.parse(storedUser));
       }
-    } catch {
-      // ignore lỗi localStorage (nếu browser chặn)
+    } catch (e) {
+      // Nếu data localStorage lỗi → clear cho sạch
+      localStorage.clear();
+    } finally {
+      setLoading(false);
     }
-  }, [token]);
+  }, []);
 
+  // Login đúng flow gốc: gọi api.login → nó sẽ tự lưu accessToken
   const login = async (username: string, password: string) => {
-    // GỌI ĐÚNG API BACKEND
-    const response = await fetch('/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Invalid username or password');
-    }
-
-    const data = await response.json();
-
-    // Backend trả về { token: '...' }
-    setToken(data.token || null);
+    const loggedInUser = await api.login(username, password);
+    setUser(loggedInUser);
+    localStorage.setItem('user', JSON.stringify(loggedInUser));
   };
 
   const logout = () => {
-    setToken(null);
-  };
-
-  const value: AuthContextType = {
-    token,
-    login,
-    logout,
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
   };
 
   return (
-    <AuthContext.Provider value={value}>
-      {children}
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
+      {!loading && children}
     </AuthContext.Provider>
   );
-};
-
-// Hook tiện cho phía ngoài (useAuth.ts đang wrap lại)
-export const useAuthContext = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuthContext must be used within an AuthProvider');
-  }
-  return ctx;
 };
