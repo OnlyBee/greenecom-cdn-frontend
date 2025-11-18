@@ -112,12 +112,7 @@ const Dashboard: React.FC = () => {
             <AdminPanel users={allUsers} folders={allFolders} onUpdate={handleDataUpdate} />
           )}
 
-<button
-  onClick={logout}
-  className="px-3 py-1 text-sm font-medium rounded-md bg-red-500 hover:bg-red-600 text-white"
->
-  Logout
-</button>
+
 
           
           <div className="mt-8 grid grid-cols-1 md:grid-cols-12 gap-8">
