@@ -13,7 +13,6 @@ const {
   PutObjectCommand,
 } = require('@aws-sdk/client-s3');
 const { URL } = require('url');
-const path = require('path');
 
 // --- CẤU HÌNH ---
 const app = express();
@@ -322,8 +321,17 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
     const folderName = folderRes.rows[0].name;
     const folderSlug = slugify(folderName);
 
-    // 2. Tải ảnh từ link gốc
-    const response = await fetch(imageUrl);
+    // 2. Tải ảnh từ link gốc (Thêm timeout 10s)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    
+    let response;
+    try {
+        response = await fetch(imageUrl, { signal: controller.signal });
+    } finally {
+        clearTimeout(timeout);
+    }
+
     if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
     
     const contentType = response.headers.get('content-type');
