@@ -75,8 +75,6 @@ export const api = {
     const formData = new FormData();
     
     // IMPORTANT: Append text fields BEFORE the file.
-    // Some middleware (like multer) might need these fields available
-    // before it finishes processing the file stream.
     formData.append('folderId', folderId);
     formData.append('folderSlug', folderSlug);
     formData.append('image', file);
@@ -119,6 +117,10 @@ export const api = {
   assignUserToFolder: (userId: string, folderId: string) => request<void>('/folders/assign', {
     method: 'POST',
     body: JSON.stringify({ userId, folderId }),
+  }),
+
+  unassignUserFromFolder: (userId: string, folderId: string) => request<void>(`/folders/${folderId}/users/${userId}`, {
+    method: 'DELETE',
   }),
 
   changePassword: (currentPassword: string, newPassword: string) => request<void>('/users/change-password', {
