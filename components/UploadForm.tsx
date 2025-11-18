@@ -156,6 +156,7 @@ const UploadForm: React.FC<Props> = ({ selectedFolder, onUploaded }) => {
 
   // ====== UI ======
   return (
+    <div className="bg-gray-700/50 p-6 rounded-lg">
     <form onSubmit={handleSubmit}>
       <div
         className="rounded-md border border-dashed border-gray-600 p-4 mb-4"
@@ -173,7 +174,7 @@ const UploadForm: React.FC<Props> = ({ selectedFolder, onUploaded }) => {
             type="file"
             accept="image/*"
             onChange={handleFileChange}
-            className="text-sm"
+            className="text-sm text-gray-300"
           />
         </div>
 
@@ -190,7 +191,7 @@ const UploadForm: React.FC<Props> = ({ selectedFolder, onUploaded }) => {
                 setStatus('Ready to upload from URL');
               }
             }}
-            className="w-full rounded-md bg-gray-800 border border-gray-600 px-3 py-2 text-sm text-gray-100"
+            className="w-full rounded-md bg-gray-800 border border-gray-600 px-3 py-2 text-sm text-gray-100 placeholder-gray-500"
           />
         </div>
 
@@ -208,7 +209,7 @@ const UploadForm: React.FC<Props> = ({ selectedFolder, onUploaded }) => {
 
         {/* Status line */}
         {status && (
-          <p className="text-sm mt-1 text-red-400">
+          <p className={`text-sm mt-1 ${status.includes('success') ? 'text-green-400' : 'text-red-400'}`}>
             {status}
           </p>
         )}
@@ -218,11 +219,12 @@ const UploadForm: React.FC<Props> = ({ selectedFolder, onUploaded }) => {
         type="button"
         onClick={() => handleSubmit()}
         disabled={loading || !selectedFolder}
-        className="px-4 py-2 rounded-md bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-4 py-2 rounded-md bg-green-600 text-white font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Uploading...' : 'Upload Image'}
       </button>
     </form>
+    </div>
   );
 };
 

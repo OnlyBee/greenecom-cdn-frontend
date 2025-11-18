@@ -141,7 +141,8 @@ app.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.json({ token, role: user.role, username: user.username });
+    // Trả về id để frontend lưu vào context
+    res.json({ token, role: user.role, username: user.username, id: user.id });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ message: 'Internal server error' });
@@ -430,7 +431,7 @@ async function handleUploadUrl(req, res) {
       .json({ error: 'folderId and imageUrl are required.' });
   }
 
-  try:
+  try {
     // Lấy tên file từ URL cho đẹp
     let fileName = 'image-from-url';
     try {

@@ -7,13 +7,7 @@ import React, {
   useState,
   ReactNode,
 } from 'react';
-
-type Role = 'ADMIN' | 'MEMBER' | string;
-
-type User = {
-  username: string;
-  role: Role;
-};
+import type { User } from '../types';
 
 type AuthContextType = {
   user: User | null;
@@ -76,7 +70,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         throw new Error(msg);
       }
 
-      // backend: { token, role, username }
+      // backend: { token, role, username, id }
       const data = await res.json();
 
       if (!data.token) {
@@ -84,6 +78,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       const userData: User = {
+        id: data.id,
         username: data.username ?? username,
         role: data.role ?? 'MEMBER',
       };

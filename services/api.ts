@@ -1,17 +1,16 @@
-
 import type { User, Folder, ImageFile } from '../types';
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = '';
 
 // --- Helper Functions ---
-const getToken = () => localStorage.getItem('accessToken');
+const getToken = () => localStorage.getItem('greenecom_token');
 
 const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
   const headers: HeadersInit = {
     ...options.headers,
   };
   const token = getToken();
-  if (token && !(options.body instanceof FormData)) {
+  if (token) {
       headers['Authorization'] = `Bearer ${token}`;
   }
   if (!(options.body instanceof FormData)) {
@@ -56,10 +55,17 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
-    if (!response.ok) throw new Error('Invalid credentials');
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Invalid credentials');
+    }
     const data = await response.json();
-    localStorage.setItem('accessToken', data.accessToken);
-    return data.user;
+    if (!data.token || !data.username) {
+        throw new Error('Login response is missing token or user data.');
+    }
+    // This is legacy, AuthContext handles this now, but keep for safety
+    localStorage.setItem('greenecom_token', data.token);
+    return { id: data.id, username: data.username, role: data.role };
   },
 
   getAllUsers: () => request<User[]>('/users'),
@@ -74,7 +80,6 @@ export const api = {
     formData.append('folderId', folderId);
     formData.append('folderSlug', folderSlug);
     
-    // Custom fetch for FormData
     const token = getToken();
     const headers: HeadersInit = {};
     if (token) {
