@@ -363,10 +363,20 @@ app.get('/folders/:folderId/images', authenticateToken, async (req, res) => {
 
 // --- IMAGES ---
 // POST /upload  (upload ảnh lên Spaces + lưu DB)
-app.post('/upload', authenticateToken, upload, async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+// IMAGES
+
+// Upload file từ máy (multipart/form-data)
+app.post('/api/upload', authenticateToken, upload, async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded.' });
+  }
 
   const { folderId, folderSlug } = req.body;
+
+  if (!folderId || !folderSlug) {
+    return res.status(400).json({ error: 'folderId and folderSlug are required.' });
+  }
+
   const key = `${folderSlug}/${Date.now().toString()}-${req.file.originalname}`;
 
   const uploadParams = {
@@ -378,9 +388,13 @@ app.post('/upload', authenticateToken, upload, async (req, res) => {
   };
 
   try {
+    // Upload lên Spaces
     await s3Client.send(new PutObjectCommand(uploadParams));
+
+    // URL public của file trên Spaces
     const fileUrl = `https://${process.env.SPACES_BUCKET}.${process.env.SPACES_REGION}.digitaloceanspaces.com/${key}`;
 
+    // Lưu DB
     const result = await pool.query(
       'INSERT INTO images (name, url, folder_id) VALUES ($1, $2, $3) RETURNING *',
       [req.file.originalname, fileUrl, folderId]
@@ -389,9 +403,42 @@ app.post('/upload', authenticateToken, upload, async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Upload or DB Error:', err);
-    res.status(500).json({ error: 'Failed to upload or save image.' });
+    // Trả về message thật để anh debug lỗi 500
+    res.status(500).json({ error: err.message });
   }
 });
+
+// Upload bằng URL (không tải file, chỉ lưu link)
+app.post('/api/upload/url', authenticateToken, async (req, res) => {
+  const { folderId, imageUrl } = req.body;
+
+  if (!folderId || !imageUrl) {
+    return res.status(400).json({ error: 'folderId and imageUrl are required.' });
+  }
+
+  try {
+    // Lấy tên file từ URL cho đẹp
+    let fileName = 'image-from-url';
+    try {
+      const u = new URL(imageUrl);
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length > 0) fileName = parts[parts.length - 1];
+    } catch (e) {
+      // URL không hợp lệ cũng không sao, dùng tên default
+    }
+
+    const result = await pool.query(
+      'INSERT INTO images (name, url, folder_id) VALUES ($1, $2, $3) RETURNING *',
+      [fileName, imageUrl, folderId]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Upload URL Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // DELETE /images/:id  (xoá ảnh)
 app.delete('/images/:id', authenticateToken, async (req, res) => {
