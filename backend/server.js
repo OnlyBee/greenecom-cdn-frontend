@@ -97,8 +97,6 @@ function isAdmin(req, res, next) {
   next();
 }
 
-// --- API ENDPOINTS ---
-
 // AUTH
 // ROUTE ĐĂNG NHẬP
 app.post('/login', async (req, res) => {
@@ -127,19 +125,28 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
-    // Tạo JWT
-    const token = jwt.sign(
-      { userId: user.id, role: user.role },
-      process.env.JWT_SECRET,
+    // Tạo JWT: LƯU Ý dùng "id" chứ không phải "userId"
+    const accessToken = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    return res.json({ token });
+    // Format trả về chuẩn cho frontend
+    return res.json({
+      accessToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
+    });
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 
 
 // USERS
