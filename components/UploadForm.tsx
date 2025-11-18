@@ -1,229 +1,87 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import React, { useState, useRef } from 'react';
+import { api } from '../services/api';
 
-type Folder = {
-  id: string;
-  name: string;
-  slug?: string;
-};
+interface UploadFormProps {
+  folderId: string;
+  folderName: string;
+  onUploadSuccess: () => void;
+}
 
-type Props = {
-  selectedFolder: Folder | null;
-  onUploaded: () => void; // gọi lại để reload danh sách ảnh
-};
+const UploadIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+    </svg>
+);
 
-const UploadForm: React.FC<Props> = ({ selectedFolder, onUploaded }) => {
-  // useAuth của anh đang trả về { token, user, login, logout } (theo context mình đã sửa)
-  const { token } = useAuth() as any;
-
+const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadSuccess }) => {
   const [file, setFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState('');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ====== PREVIEW (thumbnail) ======
-  useEffect(() => {
-    // nếu có file, dùng URL.createObjectURL
-    if (file) {
-      const objectUrl = URL.createObjectURL(file);
-      setPreviewUrl(objectUrl);
-      return () => URL.revokeObjectURL(objectUrl);
-    }
-
-    // nếu không có file nhưng có link
-    if (!file && imageUrl.trim()) {
-      setPreviewUrl(imageUrl.trim());
-    } else {
-      setPreviewUrl(null);
-    }
-  }, [file, imageUrl]);
-
-  // ====== CHỌN FILE ======
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0] || null;
-    setFile(f);
-    if (f) {
-      // khi chọn file thì clear URL (để ưu tiên upload file)
-      setImageUrl('');
-      setStatus(`Ready to upload: ${f.name}`);
-    } else {
-      setStatus(null);
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
     }
   };
-
-  // ====== DÁN ẢNH TỪ CLIPBOARD (Ctrl+V) ======
-  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
-    const files = e.clipboardData.files;
-    if (files && files.length > 0) {
-      const imgFile = files[0];
-      if (imgFile.type.startsWith('image/')) {
-        setFile(imgFile);
-        setImageUrl('');
-        setStatus(`Pasted image: ${imgFile.name}`);
-      }
-    }
-  };
-
-  // ====== SUBMIT ======
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-
-    if (!selectedFolder) {
-      setStatus('Please select a folder first.');
-      return;
-    }
-
-    if (!file && !imageUrl.trim()) {
-      setStatus('Choose a file, paste an image or enter an image URL.');
-      return;
-    }
-
-    if (!token) {
-      setStatus('Token missing – please login again.');
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) {
+      setError('Please select a file to upload.');
       return;
     }
 
     setLoading(true);
-    setStatus(null);
+    setError(null);
+    setSuccess(null);
 
     try {
-      // 1) Có file -> gửi multipart tới /api/upload
-      if (file) {
-        const formData = new FormData();
-        formData.append('image', file);
-        formData.append('folderId', selectedFolder.id);
-
-        const slug =
-          selectedFolder.slug ||
-          selectedFolder.name.toLowerCase().replace(/\s+/g, '-');
-        formData.append('folderSlug', slug);
-
-        console.log('[Upload] POST /api/upload'); // giúp anh debug
-
-        const resp = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        });
-
-        const data = await resp.json().catch(() => ({}));
-
-        if (!resp.ok) {
-          throw new Error(data.error || 'Upload failed');
-        }
-
-        setStatus('Uploaded file successfully!');
-      }
-      // 2) Không có file nhưng có URL -> POST /api/upload/url
-      else if (imageUrl.trim()) {
-        console.log('[Upload] POST /api/upload/url');
-
-        const resp = await fetch('/api/upload/url', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            folderId: selectedFolder.id,
-            imageUrl: imageUrl.trim(),
-          }),
-        });
-
-        const data = await resp.json().catch(() => ({}));
-
-        if (!resp.ok) {
-          throw new Error(data.error || 'Upload by URL failed');
-        }
-
-        setStatus('Saved image URL successfully!');
-      }
-
-      // reset & reload
+      await api.uploadImage(file, folderId, folderName);
+      setSuccess('Image uploaded successfully!');
+      onUploadSuccess();
+      
+      // Reset form
       setFile(null);
-      setImageUrl('');
-      onUploaded();
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
     } catch (err: any) {
-      console.error('Upload error:', err);
-      setStatus(err.message || 'Failed to upload or save image.');
+      setError(err.message || 'Upload failed. Please try again.');
     } finally {
       setLoading(false);
+      setTimeout(() => setSuccess(null), 3000);
     }
   };
 
-  // ====== UI ======
   return (
     <div className="bg-gray-700/50 p-6 rounded-lg">
-    <form onSubmit={handleSubmit}>
-      <div
-        className="rounded-md border border-dashed border-gray-600 p-4 mb-4"
-        onPaste={handlePaste}
-      >
-        <p className="text-sm text-gray-400 mb-2">
-          - Chọn file từ máy, hoặc<br />
-          - Dán trực tiếp ảnh (Ctrl+V), hoặc<br />
-          - Nhập URL ảnh bên dưới.
-        </p>
-
-        {/* Chọn file */}
-        <div className="flex items-center gap-2 mb-3">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="text-sm text-gray-300"
-          />
-        </div>
-
-        {/* Nhập URL */}
-        <div className="mb-3">
-          <input
-            type="text"
-            placeholder="Hoặc nhập link ảnh (https://...)"
-            value={imageUrl}
-            onChange={(e) => {
-              setImageUrl(e.target.value);
-              if (e.target.value) {
-                setFile(null); // ưu tiên URL nếu đang nhập
-                setStatus('Ready to upload from URL');
-              }
-            }}
-            className="w-full rounded-md bg-gray-800 border border-gray-600 px-3 py-2 text-sm text-gray-100 placeholder-gray-500"
-          />
-        </div>
-
-        {/* Thumbnail preview */}
-        {previewUrl && (
-          <div className="mb-3">
-            <p className="text-xs text-gray-400 mb-1">Preview:</p>
-            <img
-              src={previewUrl}
-              alt="preview"
-              className="max-h-40 rounded-md border border-gray-700"
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+            <label htmlFor="file-upload" className="block text-sm font-medium text-gray-300 mb-2">
+              Upload from your computer
+            </label>
+            <input 
+                ref={fileInputRef}
+                id="file-upload" 
+                type="file" 
+                onChange={handleFileChange} 
+                accept="image/*" 
+                className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700"
             />
-          </div>
-        )}
-
-        {/* Status line */}
-        {status && (
-          <p className={`text-sm mt-1 ${status.includes('success') ? 'text-green-400' : 'text-red-400'}`}>
-            {status}
-          </p>
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => handleSubmit()}
-        disabled={loading || !selectedFolder}
-        className="px-4 py-2 rounded-md bg-green-600 text-white font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? 'Uploading...' : 'Upload Image'}
-      </button>
-    </form>
+        </div>
+        
+        <div className="pt-2">
+            <button type="submit" disabled={loading || !file} className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-green-500 disabled:bg-green-800 disabled:opacity-50">
+                <UploadIcon/>
+                {loading ? 'Uploading...' : 'Upload Image'}
+            </button>
+        </div>
+      </form>
+      {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+      {success && <p className="mt-4 text-sm text-green-400">{success}</p>}
     </div>
   );
 };
