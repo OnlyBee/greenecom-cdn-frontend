@@ -21,9 +21,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 // Kết nối Postgres qua DATABASE_URL (DigitalOcean)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: { rejectUnauthorized: false },
 });
 
 // Kết nối DigitalOcean Spaces (S3 compatible)
@@ -52,6 +50,7 @@ app.get('/', (req, res) => {
 });
 
 // --- DEBUG ROUTES ---
+
 // Xem toàn bộ user + DB URL hiện tại
 app.get('/debug/users', async (req, res) => {
   try {
@@ -72,8 +71,7 @@ app.get('/debug/users', async (req, res) => {
 app.get('/debug/reset-admin', async (req, res) => {
   try {
     const password = 'Rinnguyen@123';
-    const saltRounds = 10;
-    const hash = await bcrypt.hash(password, saltRounds);
+    const hash = await bcrypt.hash(password, 10);
 
     await pool.query(
       'UPDATE users SET password_hash = $1 WHERE username = $2',
@@ -151,6 +149,7 @@ app.post('/login', async (req, res) => {
 });
 
 // --- USERS ---
+
 // GET /users  (ADMIN xem danh sách user)
 app.get('/users', authenticateToken, isAdmin, async (req, res) => {
   try {
@@ -223,6 +222,7 @@ app.delete('/users/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // --- FOLDERS ---
+
 // GET /folders  (ADMIN xem tất cả folder)
 app.get('/folders', authenticateToken, isAdmin, async (req, res) => {
   try {
@@ -284,28 +284,41 @@ app.delete('/folders/:id', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// POST /folders/assign  (ADMIN gán user vào folder)
-app.post('/folders/assign', authenticateToken, isAdmin, async (req, res) => {
+// Handler dùng chung cho assign (để tạo alias route)
+async function handleAssignFolder(req, res) {
   const { userId, folderId } = req.body;
+
+  if (!userId || !folderId) {
+    return res
+      .status(400)
+      .json({ error: 'userId and folderId are required.' });
+  }
+
   try {
     await pool.query(
       'INSERT INTO folder_assignments (user_id, folder_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
       [userId, folderId]
     );
-    res.sendStatus(200);
+    res.status(200).json({ message: 'Assigned OK' });
   } catch (error) {
     console.error('Assign User Error:', error);
     res.status(500).json({ error: error.message });
   }
-});
+}
+
+// POST /folders/assign  (ADMIN gán user vào folder)
+// và /api/folders/assign để phòng trường hợp frontend dùng prefix /api
+app.post('/folders/assign', authenticateToken, isAdmin, handleAssignFolder);
+app.post('/api/folders/assign', authenticateToken, isAdmin, handleAssignFolder);
 
 // --- DATA CHO USER ĐÃ LOGIN ---
+
 // GET /users/:userId/folders  (User xem các folder mình được gán)
 app.get('/users/:userId/folders', authenticateToken, async (req, res) => {
   const { userId, role } = req.user;
   const targetId = req.params.userId;
 
-  if (userId !== targetId && role !== 'ADMIN') {
+  if (String(userId) !== String(targetId) && role !== 'ADMIN') {
     return res.status(403).send('Forbidden');
   }
 
@@ -362,11 +375,9 @@ app.get('/folders/:folderId/images', authenticateToken, async (req, res) => {
 });
 
 // --- IMAGES ---
-// POST /upload  (upload ảnh lên Spaces + lưu DB)
-// IMAGES
 
-// Upload file từ máy (multipart/form-data)
-app.post('/api/upload', authenticateToken, upload, async (req, res) => {
+// Handler upload file (từ máy)
+async function handleUploadFile(req, res) {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded.' });
   }
@@ -374,7 +385,9 @@ app.post('/api/upload', authenticateToken, upload, async (req, res) => {
   const { folderId, folderSlug } = req.body;
 
   if (!folderId || !folderSlug) {
-    return res.status(400).json({ error: 'folderId and folderSlug are required.' });
+    return res
+      .status(400)
+      .json({ error: 'folderId and folderSlug are required.' });
   }
 
   const key = `${folderSlug}/${Date.now().toString()}-${req.file.originalname}`;
@@ -403,20 +416,21 @@ app.post('/api/upload', authenticateToken, upload, async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Upload or DB Error:', err);
-    // Trả về message thật để anh debug lỗi 500
     res.status(500).json({ error: err.message });
   }
-});
+}
 
-// Upload bằng URL (không tải file, chỉ lưu link)
-app.post('/api/upload/url', authenticateToken, async (req, res) => {
+// Handler upload URL
+async function handleUploadUrl(req, res) {
   const { folderId, imageUrl } = req.body;
 
   if (!folderId || !imageUrl) {
-    return res.status(400).json({ error: 'folderId and imageUrl are required.' });
+    return res
+      .status(400)
+      .json({ error: 'folderId and imageUrl are required.' });
   }
 
-  try {
+  try:
     // Lấy tên file từ URL cho đẹp
     let fileName = 'image-from-url';
     try {
@@ -437,8 +451,19 @@ app.post('/api/upload/url', authenticateToken, async (req, res) => {
     console.error('Upload URL Error:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}
 
+// Alias route cho upload file:
+// - /upload
+// - /api/upload
+app.post('/upload', authenticateToken, upload, handleUploadFile);
+app.post('/api/upload', authenticateToken, upload, handleUploadFile);
+
+// Alias route cho upload URL:
+// - /upload/url
+// - /api/upload/url
+app.post('/upload/url', authenticateToken, handleUploadUrl);
+app.post('/api/upload/url', authenticateToken, handleUploadUrl);
 
 // DELETE /images/:id  (xoá ảnh)
 app.delete('/images/:id', authenticateToken, async (req, res) => {
