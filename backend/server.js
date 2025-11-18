@@ -169,7 +169,8 @@ app.post(['/folders/assign', '/api/folders/assign'], authenticateToken, isAdmin,
       'INSERT INTO folder_assignments (user_id, folder_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
       [userId, folderId]
     );
-    res.sendStatus(200);
+    // FIX: Return JSON so frontend doesn't crash on response.json()
+    res.status(200).json({ success: true, message: 'Assigned successfully' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -206,9 +207,14 @@ app.get(['/folders/:folderId/images', '/api/folders/:folderId/images'], authenti
 // Upload File (Multipart)
 app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  
   try {
     const { folderId, folderSlug } = req.body;
-    const key = `${folderSlug}/${Date.now()}-${req.file.originalname}`;
+    // Sanitize filename to prevent issues with spaces/unicode in S3 Keys
+    const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const slug = folderSlug || 'default';
+    const key = `${slug}/${Date.now()}-${safeFilename}`;
+    
     await s3Client.send(new PutObjectCommand({
       Bucket: process.env.SPACES_BUCKET,
       Key: key,
@@ -216,29 +222,34 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
       ACL: 'public-read',
       ContentType: req.file.mimetype,
     }));
+    
     const fileUrl = `https://${process.env.SPACES_BUCKET}.${process.env.SPACES_REGION}.digitaloceanspaces.com/${key}`;
+    
     const result = await pool.query(
       'INSERT INTO images (name, url, folder_id) VALUES ($1, $2, $3) RETURNING *',
       [req.file.originalname, fileUrl, folderId]
     );
     res.status(201).json(result.rows[0]);
-  } catch (e) { console.error(e); res.status(500).json({ error: 'Upload failed' }); }
+  } catch (e) { 
+    console.error('Upload Error:', e); 
+    res.status(500).json({ error: 'Upload failed' }); 
+  }
 });
 
-// Upload URL (JSON) - NEW FEATURE
+// Upload URL (JSON)
 app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res) => {
   const { folderId, imageUrl } = req.body;
   if (!folderId || !imageUrl) return res.status(400).json({ error: 'Missing info' });
 
   try {
-    // Tạo tên file giả định từ URL
     let fileName = 'image-from-url.jpg';
     try {
       const u = new URL(imageUrl);
       const pathParts = u.pathname.split('/');
       if (pathParts.length > 0) {
         const last = pathParts[pathParts.length - 1];
-        if (last && last.length < 255) fileName = last;
+        // Sanitize
+        if (last) fileName = last.replace(/[^a-zA-Z0-9.-]/g, '_');
       }
     } catch (err) {}
 
@@ -257,7 +268,6 @@ app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, re
     const imgRes = await client.query('SELECT url FROM images WHERE id = $1', [req.params.id]);
     if (imgRes.rows.length > 0) {
       const u = new URL(imgRes.rows[0].url);
-      // Chỉ xoá trên S3 nếu là file host tại Spaces (tránh xoá link ngoài)
       if (u.hostname.includes('digitaloceanspaces.com')) {
         await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.SPACES_BUCKET, Key: u.pathname.substring(1) }));
       }
