@@ -30,7 +30,8 @@ const request = async <T>(url: string, options: RequestInit = {}): Promise<T> =>
     let errorMsg = `HTTP error! status: ${response.status}`;
     try {
         const errorData = await response.json();
-        errorMsg = errorData.error || errorData.message || errorMsg;
+        // Prioritize error message from backend
+        errorMsg = errorData.error || errorData.message || errorData.code || errorMsg;
     } catch (e) { /* Ignore parsing error */ }
     throw new Error(errorMsg);
   }
@@ -91,8 +92,14 @@ export const api = {
         body: formData,
     });
      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
+        let errorMsg = 'Upload failed';
+        try {
+            const errorData = await response.json();
+            errorMsg = errorData.error || errorData.message || `Server Error: ${errorData.code || response.status}`;
+        } catch (e) {
+            errorMsg = `Upload failed (Status: ${response.status})`;
+        }
+        throw new Error(errorMsg);
     }
   },
 
