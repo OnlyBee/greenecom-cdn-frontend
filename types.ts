@@ -8,6 +8,7 @@ export interface User {
   id: string;
   username: string;
   role: Role;
+  assigned_folders?: { id: string; name: string }[];
 }
 
 export interface ImageFile {
@@ -21,5 +22,5 @@ export interface ImageFile {
 export interface Folder {
   id: string;
   name: string;
-  assignedUserIds: string[];
+  assigned_users?: { id: string; username: string }[];
 }
