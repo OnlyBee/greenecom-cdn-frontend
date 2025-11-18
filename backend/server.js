@@ -100,25 +100,47 @@ function isAdmin(req, res, next) {
 // --- API ENDPOINTS ---
 
 // AUTH
-app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
+// ROUTE ĐĂNG NHẬP
+app.post('/login', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-    const user = result.rows[0];
-    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
-    
-    const isPasswordCorrect = await bcrypt.compare(password, user.password_hash);
-    if (isPasswordCorrect) {
-      const accessToken = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
-      res.json({ accessToken, user: { id: user.id, username: user.username, role: user.role } });
-    } else {
-      res.status(400).json({ message: 'Invalid credentials' });
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
     }
-  } catch (error) {
-    console.error('!!! LOGIN ERROR:', error);
-    res.status(500).json({ error: 'Server error during login process.' });
+
+    // Lấy user từ DB
+    const result = await pool.query(
+      'SELECT id, username, password_hash, role FROM users WHERE username = $1',
+      [username]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    const user = result.rows[0];
+
+    // So sánh password
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    // Tạo JWT
+    const token = jwt.sign(
+      { userId: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return res.json({ token });
+  } catch (err) {
+    console.error('Login error:', err);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 
 // USERS
 app.get('/api/users', authenticateToken, isAdmin, async (req, res) => {
