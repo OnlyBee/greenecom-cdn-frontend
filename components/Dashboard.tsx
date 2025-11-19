@@ -101,6 +101,16 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleRenameImage = async (imageId: string, newName: string) => {
+      try {
+          await api.renameImage(imageId, newName);
+          fetchImages(); // Reload images to show new name
+      } catch (e: any) {
+          console.error("Failed to rename image:", e);
+          alert(e.message || 'Failed to rename image.');
+      }
+  };
+
   const currentFolderName = folders.find(f => f.id === selectedFolder)?.name || 'Select a folder';
 
   return (
@@ -150,7 +160,11 @@ const Dashboard: React.FC = () => {
                     />
                     <div className="mt-8 border-t border-gray-700 pt-8">
                         <h3 className="text-xl font-semibold mb-4 text-white">Images</h3>
-                        <ImageGrid images={images} onDelete={handleDeleteImage} />
+                        <ImageGrid 
+                            images={images} 
+                            onDelete={handleDeleteImage} 
+                            onRename={handleRenameImage}
+                        />
                     </div>
                 </div>
               )}
