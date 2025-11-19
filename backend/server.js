@@ -27,16 +27,18 @@ const pool = new Pool({
 // --- S3 CONFIG (FIXED FOR SGP1) ---
 const spacesRegion = process.env.SPACES_REGION ? process.env.SPACES_REGION.trim() : 'sgp1';
 const spacesBucket = process.env.SPACES_BUCKET ? process.env.SPACES_BUCKET.trim() : 'greene';
-const spacesEndpoint = process.env.SPACES_ENDPOINT ? process.env.SPACES_ENDPOINT.trim() : `https://${spacesRegion}.digitaloceanspaces.com`;
+// Endpoint phải chính xác cho S3 Client
+const spacesEndpoint = process.env.SPACES_ENDPOINT 
+  ? process.env.SPACES_ENDPOINT.trim() 
+  : `https://${spacesRegion}.digitaloceanspaces.com`;
 
 // --- CDN CONFIG ---
+// Mặc định dùng link trực tiếp của Spaces để đảm bảo ảnh luôn hiển thị nếu CDN chưa cấu hình xong
 let cdnBaseUrl = `https://${spacesBucket}.${spacesRegion}.digitaloceanspaces.com`;
 
-// Ưu tiên CDN_URL từ env, nếu không có và bucket là 'greene' thì dùng domain riêng
+// Nếu biến môi trường CDN_URL được set (ví dụ: https://cdn.greenecom.net), thì dùng nó
 if (process.env.CDN_URL) {
   cdnBaseUrl = process.env.CDN_URL.trim().replace(/\/+$/, '');
-} else if (spacesBucket === 'greene') {
-  cdnBaseUrl = 'https://cdn.greenecom.net';
 }
 
 const s3Config = {
@@ -280,7 +282,6 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
     if (!folderId) return res.status(400).json({ error: 'Folder ID missing' });
 
     const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    // Nếu frontend không gửi slug, query từ DB
     let slug = folderSlug;
     if (!slug) {
          const fRes = await pool.query('SELECT name FROM folders WHERE id = $1', [folderId]);
@@ -294,7 +295,7 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
       Key: key,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
-      // ACL: 'public-read' // Đã bỏ để tránh lỗi 500 AccessDenied
+      ACL: 'public-read' // QUAN TRỌNG: Cho phép file công khai để browser xem được
     }));
     
     const fileUrl = `${cdnBaseUrl}/${key}`;
@@ -315,19 +316,22 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
   if (!folderId || !imageUrl) return res.status(400).json({ error: 'Missing info' });
 
   try {
-    // 1. Lấy tên folder từ DB để tạo slug chuẩn
+    // 1. Lấy tên folder
     const folderRes = await pool.query('SELECT name FROM folders WHERE id = $1', [folderId]);
     if (folderRes.rows.length === 0) return res.status(404).json({ error: 'Folder not found' });
     const folderName = folderRes.rows[0].name;
     const folderSlug = slugify(folderName);
 
-    // 2. Tải ảnh từ link gốc (Thêm timeout 10s)
+    // 2. Tải ảnh (Timeout 10s)
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     
     let response;
     try {
         response = await fetch(imageUrl, { signal: controller.signal });
+    } catch (err) {
+        if (err.name === 'AbortError') throw new Error('Timeout: Image took too long to download');
+        throw err;
     } finally {
         clearTimeout(timeout);
     }
@@ -336,45 +340,40 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
     
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.startsWith('image/')) {
-        return res.status(400).json({ error: 'URL does not point to a valid image (content-type mismatch)' });
+        return res.status(400).json({ error: 'URL does not point to a valid image' });
     }
 
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
-    // Lấy extension từ url hoặc content-type
     let ext = '.jpg';
     if (contentType.includes('png')) ext = '.png';
     else if (contentType.includes('gif')) ext = '.gif';
     else if (contentType.includes('webp')) ext = '.webp';
 
-    // Tạo tên file
     let fileName = `image-${Date.now()}${ext}`;
     try {
       const u = new URL(imageUrl);
       const parts = u.pathname.split('/');
       const last = parts[parts.length - 1];
-      // Lọc tên file sạch sẽ
       if (last && last.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
           fileName = last.replace(/[^a-zA-Z0-9.-]/g, '_');
-      } else {
-          fileName = `${last.replace(/[^a-zA-Z0-9.-]/g, '_')}-${Date.now()}${ext}`;
       }
     } catch(e) {}
 
     const key = `${folderSlug}/${Date.now()}-${fileName}`;
 
-    // 3. Upload lên Spaces
+    // 3. Upload lên Spaces (có ACL public-read)
     await s3Client.send(new PutObjectCommand({
       Bucket: spacesBucket,
       Key: key,
       Body: buffer,
       ContentType: contentType,
+      ACL: 'public-read' // QUAN TRỌNG: Cho phép file công khai
     }));
 
-    // 4. Lưu link CDN vào DB
+    // 4. Lưu link
     const fileUrl = `${cdnBaseUrl}/${key}`;
-    
     const result = await pool.query(
       'INSERT INTO images (name, url, folder_id) VALUES ($1, $2, $3) RETURNING *',
       [fileName, fileUrl, folderId]
