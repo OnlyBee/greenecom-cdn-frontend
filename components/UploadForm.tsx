@@ -21,113 +21,173 @@ const LinkIcon = () => (
 );
 
 const XIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
 );
 
 const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadSuccess }) => {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [urlInput, setUrlInput] = useState('');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Generate preview when file/url changes
+  // Generate previews when files change
   useEffect(() => {
-    if (file) {
-        const objUrl = URL.createObjectURL(file);
-        setPreviewUrl(objUrl);
-        return () => URL.revokeObjectURL(objUrl);
+    if (files.length > 0) {
+        const urls = files.map(file => URL.createObjectURL(file));
+        setPreviewUrls(urls);
+        return () => {
+            urls.forEach(url => URL.revokeObjectURL(url));
+        };
     } else if (urlInput.trim()) {
-        setPreviewUrl(urlInput.trim());
+        setPreviewUrls([urlInput.trim()]);
     } else {
-        setPreviewUrl(null);
+        setPreviewUrls([]);
     }
-  }, [file, urlInput]);
+  }, [files, urlInput]);
+
+  // Handle Drag Events
+  const handleDrag = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.type === 'dragenter' || e.type === 'dragover') {
+          setIsDragActive(true);
+      } else if (e.type === 'dragleave') {
+          setIsDragActive(false);
+      }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragActive(false);
+
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const droppedFiles = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+          if (droppedFiles.length > 0) {
+              setFiles(prev => [...prev, ...droppedFiles]);
+              setUrlInput('');
+              setError(null);
+          }
+      }
+  };
 
   // Handle Paste (Ctrl+V)
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    // If typing in URL input, don't intercept paste
+    if (isFocusedOnInput(e)) return;
+
     const items = e.clipboardData.items;
+    const pastedFiles: File[] = [];
     
-    // 1. Check for File (Image)
+    // 1. Check for Files (Image)
     for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image') !== -1) {
             const blob = items[i].getAsFile();
             if (blob) {
-                // Sometimes pasted images don't have a name (e.g. 'image.png'), verify it
-                if (!blob.name) {
-                    // Create a new File object with a name if missing
-                    const renamedFile = new File([blob], `pasted-image-${Date.now()}.png`, { type: blob.type });
-                    setFile(renamedFile);
-                } else {
-                    setFile(blob);
-                }
-                setUrlInput('');
-                setError(null);
-                return;
+                const name = blob.name || `pasted-image-${Date.now()}.png`;
+                const renamedFile = new File([blob], name, { type: blob.type });
+                pastedFiles.push(renamedFile);
             }
         }
+    }
+
+    if (pastedFiles.length > 0) {
+        setFiles(prev => [...prev, ...pastedFiles]);
+        setUrlInput('');
+        setError(null);
+        return;
     }
 
     // 2. Check for Text (URL)
     const pastedText = e.clipboardData.getData('text');
     if (pastedText && pastedText.match(/^https?:\/\/.+/)) {
-        setFile(null);
+        setFiles([]);
         setUrlInput(pastedText);
         setError(null);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
       setUrlInput('');
       setError(null);
     }
+    // Reset input so same file can be selected again if needed
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemoveFile = (index: number) => {
+      setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleClear = () => {
-      setFile(null);
+      setFiles([]);
       setUrlInput('');
-      setPreviewUrl(null);
+      setPreviewUrls([]);
       setError(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setProgress('');
   };
 
   const handleSubmit = async () => {
-    if (!file && !urlInput) {
-        setError('Please select a file or enter a URL.');
+    if (files.length === 0 && !urlInput) {
+        setError('Please select files or enter a URL.');
         return;
     }
 
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setProgress('');
 
     try {
-        if (file) {
-            await api.uploadImage(file, folderId, folderName);
+        if (files.length > 0) {
+            // Upload multiple files one by one (or parallel)
+            let successCount = 0;
+            for (let i = 0; i < files.length; i++) {
+                setProgress(`Uploading ${i + 1}/${files.length}...`);
+                try {
+                    await api.uploadImage(files[i], folderId, folderName);
+                    successCount++;
+                } catch (err) {
+                    console.error(`Failed to upload ${files[i].name}`, err);
+                    // Continue uploading others
+                }
+            }
+            
+            if (successCount === files.length) {
+                setSuccess(`All ${files.length} images uploaded successfully!`);
+            } else {
+                setSuccess(`Uploaded ${successCount}/${files.length} images. Some failed.`);
+            }
+
         } else if (urlInput) {
+            setProgress('Saving URL...');
             await api.uploadImageUrl(urlInput, folderId);
+            setSuccess('Image saved successfully!');
         }
-        setSuccess('Image uploaded successfully!');
+
         handleClear();
         onUploadSuccess();
     } catch (err: any) {
         setError(err.message || 'Upload failed. Please try again.');
     } finally {
         setLoading(false);
+        setProgress('');
         setTimeout(() => setSuccess(null), 3000);
     }
   };
 
-  // Check if pasting is currently happening in a text input to avoid double handling
   const isFocusedOnInput = (e: any) => {
       return e.target.tagName === 'INPUT' && e.target.type === 'text';
   };
@@ -135,86 +195,115 @@ const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadS
   return (
     <div 
         ref={containerRef}
-        onPaste={(e) => {
-            // Only handle paste on the container if not focused on the URL input
-            if (!isFocusedOnInput(e)) handlePaste(e);
-        }}
-        className="bg-gray-700/50 p-6 rounded-lg border-2 border-dashed border-gray-600 hover:border-gray-500 transition-colors relative outline-none"
-        tabIndex={0} // Make div focusable to capture paste
+        onDragEnter={handleDrag}
+        onDragLeave={handleDrag}
+        onDragOver={handleDrag}
+        onDrop={handleDrop}
+        onPaste={handlePaste}
+        className={`
+            p-6 rounded-lg border-2 border-dashed transition-all relative outline-none
+            ${isDragActive ? 'border-green-500 bg-green-900/20' : 'border-gray-600 bg-gray-700/50 hover:border-gray-500'}
+        `}
+        tabIndex={0} 
     >
       <div className="flex flex-col items-center space-y-4">
         
-        {/* HEADER */}
-        {!previewUrl && (
+        {/* HEADER / INPUTS */}
+        {files.length === 0 && !urlInput && (
             <div className="text-center space-y-2">
-                <p className="text-gray-300 font-medium">
-                    Drag & Drop, Paste (Ctrl+V), or Select an Image
+                <p className="text-gray-300 font-medium pointer-events-none">
+                    Drag & Drop files here, Paste (Ctrl+V)
                 </p>
                 <div className="flex items-center justify-center space-x-4">
                     <label className="cursor-pointer bg-gray-600 hover:bg-gray-500 text-white text-sm px-4 py-2 rounded-md transition">
-                        Choose File
+                        Select Files
                         <input 
                             ref={fileInputRef}
                             type="file" 
                             className="hidden" 
                             accept="image/*"
+                            multiple // Enable multiple
                             onChange={handleFileSelect}
                         />
                     </label>
                     <span className="text-gray-400 text-sm">- or -</span>
                     <input 
                         type="text"
-                        placeholder="Paste image URL here..."
+                        placeholder="Paste image URL..."
                         className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm text-white w-64 focus:ring-2 focus:ring-green-500 outline-none"
                         value={urlInput}
                         onChange={(e) => {
                             setUrlInput(e.target.value);
-                            if(e.target.value) setFile(null);
+                            if(e.target.value) setFiles([]);
                         }}
                     />
                 </div>
             </div>
         )}
 
-        {/* PREVIEW AREA */}
-        {previewUrl && (
-            <div className="relative w-full max-w-md bg-gray-800 rounded-lg p-2 border border-gray-600">
-                <img 
-                    src={previewUrl} 
-                    alt="Preview" 
-                    className="w-full h-64 object-contain rounded-md bg-black/20"
-                    onError={() => setError('Invalid Image URL')}
-                />
-                <button 
-                    onClick={handleClear}
-                    className="absolute top-[-10px] right-[-10px] bg-red-500 hover:bg-red-600 text-white p-1 rounded-full shadow-lg"
-                >
-                    <XIcon />
-                </button>
-                <div className="mt-2 text-center">
-                    <p className="text-xs text-gray-400 truncate px-2">
-                        {file ? `File: ${file.name}` : 'External Link'}
-                    </p>
+        {/* PREVIEW AREA (GRID) */}
+        {previewUrls.length > 0 && (
+            <div className="w-full">
+                <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-sm text-gray-400">
+                        {files.length > 0 ? `${files.length} file(s) selected` : 'External URL'}
+                    </h4>
+                    <button onClick={handleClear} className="text-xs text-red-400 hover:text-red-300">Clear All</button>
+                </div>
+
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 max-h-60 overflow-y-auto custom-scrollbar">
+                    {previewUrls.map((url, idx) => (
+                        <div key={idx} className="relative group bg-gray-800 rounded-md border border-gray-600 aspect-square">
+                            <img 
+                                src={url} 
+                                alt="Preview" 
+                                className="w-full h-full object-cover rounded-md"
+                            />
+                            {files.length > 0 && (
+                                <button 
+                                    onClick={() => handleRemoveFile(idx)}
+                                    className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <XIcon />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                    {/* Add more button */}
+                    {files.length > 0 && (
+                         <label className="cursor-pointer flex flex-col items-center justify-center bg-gray-800/50 border-2 border-dashed border-gray-600 hover:border-gray-400 rounded-md aspect-square transition">
+                            <span className="text-2xl text-gray-400">+</span>
+                            <input 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*"
+                                multiple
+                                onChange={handleFileSelect}
+                            />
+                        </label>
+                    )}
                 </div>
             </div>
         )}
 
         {/* ACTION BUTTONS */}
-        <div className="w-full flex justify-center pt-2">
+        <div className="w-full flex flex-col items-center justify-center pt-2 space-y-2">
+             {loading && <span className="text-sm text-blue-300 animate-pulse">{progress}</span>}
+             
              <button 
                 onClick={handleSubmit} 
-                disabled={loading || !previewUrl} 
+                disabled={loading || previewUrls.length === 0} 
                 className={`
                     flex items-center px-6 py-2 rounded-md font-semibold text-white transition-all
-                    ${loading || !previewUrl ? 'bg-gray-600 opacity-50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-green-500/30'}
+                    ${loading || previewUrls.length === 0 ? 'bg-gray-600 opacity-50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-green-500/30'}
                 `}
             >
                 {loading ? (
-                    <span>Uploading...</span>
+                    <span>Processing...</span>
                 ) : (
                     <>
-                        {file ? <UploadIcon /> : <LinkIcon />}
-                        {file ? 'Upload File' : 'Save URL'}
+                        {files.length > 0 ? <UploadIcon /> : <LinkIcon />}
+                        {files.length > 0 ? `Upload ${files.length} Files` : 'Save URL'}
                     </>
                 )}
             </button>
