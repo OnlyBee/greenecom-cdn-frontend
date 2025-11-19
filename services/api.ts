@@ -111,6 +111,12 @@ export const api = {
       });
   },
 
+  // 3. Rename Image
+  renameImage: (imageId: string, newName: string) => request<ImageFile>(`/images/${imageId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name: newName })
+  }),
+
   createUser: (username: string, password: string) => request<User>('/users', {
     method: 'POST',
     body: JSON.stringify({ username, password }),
