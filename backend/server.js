@@ -11,6 +11,7 @@ const {
   S3Client,
   DeleteObjectCommand,
   PutObjectCommand,
+  PutObjectAclCommand // Import thêm lệnh set ACL
 } = require('@aws-sdk/client-s3');
 const { URL } = require('url');
 
@@ -290,13 +291,25 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
     
     const key = `${slug}/${Date.now()}-${safeFilename}`;
     
+    // Upload file
     await s3Client.send(new PutObjectCommand({
       Bucket: spacesBucket,
       Key: key,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
-      ACL: 'public-read' // QUAN TRỌNG: Cho phép file công khai để browser xem được
+      ACL: 'public-read'
     }));
+
+    // Ép quyền public-read riêng (cho chắc chắn với mọi loại bucket)
+    try {
+        await s3Client.send(new PutObjectAclCommand({
+            Bucket: spacesBucket,
+            Key: key,
+            ACL: 'public-read'
+        }));
+    } catch (aclErr) {
+        console.warn('Set ACL Failed:', aclErr.message);
+    }
     
     const fileUrl = `${cdnBaseUrl}/${key}`;
     const result = await pool.query(
@@ -363,14 +376,25 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
 
     const key = `${folderSlug}/${Date.now()}-${fileName}`;
 
-    // 3. Upload lên Spaces (có ACL public-read)
+    // 3. Upload lên Spaces
     await s3Client.send(new PutObjectCommand({
       Bucket: spacesBucket,
       Key: key,
       Body: buffer,
       ContentType: contentType,
-      ACL: 'public-read' // QUAN TRỌNG: Cho phép file công khai
+      ACL: 'public-read'
     }));
+
+     // Ép quyền public-read riêng
+    try {
+        await s3Client.send(new PutObjectAclCommand({
+            Bucket: spacesBucket,
+            Key: key,
+            ACL: 'public-read'
+        }));
+    } catch (aclErr) {
+        console.warn('Set ACL Failed:', aclErr.message);
+    }
 
     // 4. Lưu link
     const fileUrl = `${cdnBaseUrl}/${key}`;
@@ -386,6 +410,37 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
   }
 });
 
+// RENAME IMAGE (New)
+app.put(['/images/:id', '/api/images/:id'], authenticateToken, async (req, res) => {
+    const { name } = req.body;
+    const imageId = req.params.id;
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    try {
+        // Kiểm tra quyền (User phải được assign vào folder chứa ảnh này)
+        if (req.user.role !== 'ADMIN') {
+             const permCheck = await pool.query(`
+                SELECT 1 
+                FROM images i
+                JOIN folder_assignments fa ON i.folder_id = fa.folder_id
+                WHERE i.id = $1 AND fa.user_id = $2
+             `, [imageId, req.user.id]);
+             if (permCheck.rows.length === 0) {
+                 return res.status(403).json({ error: 'Access denied to rename this image' });
+             }
+        }
+
+        const result = await pool.query(
+            'UPDATE images SET name = $1 WHERE id = $2 RETURNING *',
+            [name, imageId]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Image not found' });
+        res.json(result.rows[0]);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
@@ -393,6 +448,7 @@ app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, re
     const imgRes = await client.query('SELECT url FROM images WHERE id = $1', [req.params.id]);
     if (imgRes.rows.length > 0) {
       const u = new URL(imgRes.rows[0].url);
+      // Chỉ xoá trên Spaces nếu là host của mình
       if (u.hostname.includes('digitaloceanspaces.com') || u.hostname.includes('greenecom.net')) {
         const key = u.pathname.substring(1);
         await s3Client.send(new DeleteObjectCommand({ Bucket: spacesBucket, Key: key }));
