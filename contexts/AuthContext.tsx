@@ -29,7 +29,7 @@ const TOKEN_KEY = 'greenecom_token';
 const USER_KEY = 'greenecom_user';
 
 type DecodedToken = {
-  userId: string;
+  id: string; // Đã sửa: Backend gửi 'id', không phải 'userId'
   role: Role;
   exp: number;
   iat: number;
@@ -90,7 +90,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const loggedUser: User = {
-      id: decoded.userId,
+      id: decoded.id, // Đã sửa: lấy đúng field id
       username: data.username || username,
       role: decoded.role || (data.role as Role),
     };
