@@ -108,7 +108,7 @@ app.post(['/login', '/api/login'], async (req, res) => {
     if (!isMatch) return res.status(401).json({ message: 'Invalid username or password' });
 
     const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token });
+    res.json({ token, username: user.username, role: user.role }); // Trả thêm info để frontend đỡ phải decode
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -247,7 +247,11 @@ app.delete(['/folders/:folderId/users/:userId', '/api/folders/:folderId/users/:u
 // 4. View Data
 app.get(['/users/:userId/folders', '/api/users/:userId/folders'], authenticateToken, async (req, res) => {
   const { userId } = req.params;
-  if (req.user.role !== 'ADMIN' && req.user.id !== userId) return res.status(403).send('Forbidden');
+  // Fix logic check ID: convert both to string to prevent type mismatch (number vs string)
+  if (req.user.role !== 'ADMIN' && String(req.user.id) !== String(userId)) {
+      return res.status(403).send('Forbidden');
+  }
+  
   try {
     const result = await pool.query(
       `SELECT f.* FROM folders f JOIN folder_assignments fa ON f.id = fa.folder_id WHERE fa.user_id = $1 ORDER BY f.name ASC`,
