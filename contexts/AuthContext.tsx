@@ -29,8 +29,9 @@ const TOKEN_KEY = 'greenecom_token';
 const USER_KEY = 'greenecom_user';
 
 type DecodedToken = {
-  id: string; // Đã sửa: Backend gửi 'id', không phải 'userId'
+  id: string;
   role: Role;
+  username?: string; // Backend có gửi kèm username trong token
   exp: number;
   iat: number;
 };
@@ -52,16 +53,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Load lại từ localStorage khi F5
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
-    const storedUser = localStorage.getItem(USER_KEY);
+    // Chúng ta không tin tưởng hoàn toàn vào storedUser vì nó có thể là format cũ (userId thay vì id)
+    // const storedUser = localStorage.getItem(USER_KEY); 
 
-    if (storedToken && storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser) as User;
+    if (storedToken) {
+      const decoded = decodeToken(storedToken);
+      
+      // Kiểm tra token còn hạn và có id hợp lệ không
+      if (decoded && decoded.id && decoded.exp * 1000 > Date.now()) {
         setToken(storedToken);
-        setUser(parsedUser);
-      } catch {
+        
+        // Tái tạo object User từ token để đảm bảo luôn có 'id'
+        // (Lấy username từ localStorage cũ nếu token không có, để hiển thị cho đẹp)
+        let username = decoded.username || 'User';
+        try {
+             const oldUserStorage = JSON.parse(localStorage.getItem(USER_KEY) || '{}');
+             if (oldUserStorage.username) username = oldUserStorage.username;
+        } catch {}
+
+        const restoredUser: User = {
+            id: decoded.id,
+            role: decoded.role,
+            username: username
+        };
+
+        setUser(restoredUser);
+        // Cập nhật lại localStorage cho đúng chuẩn mới
+        localStorage.setItem(USER_KEY, JSON.stringify(restoredUser));
+      } else {
+        // Token lỗi hoặc hết hạn -> Logout
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
+        setToken(null);
+        setUser(null);
       }
     }
   }, []);
