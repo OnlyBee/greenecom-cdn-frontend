@@ -1,14 +1,13 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import ChangePasswordModal from './ChangePasswordModal';
 
 interface HeaderProps {
-  currentView: 'cdn' | 'pod_power';
-  onChangeView: (view: 'cdn' | 'pod_power') => void;
+  currentView?: 'cdn' | 'pod_power';
+  onChangeView?: (view: 'cdn' | 'pod_power') => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ currentView, onChangeView }) => {
+const Header: React.FC<HeaderProps> = ({ currentView = 'cdn', onChangeView }) => {
   const { user, logout } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -18,37 +17,37 @@ const Header: React.FC<HeaderProps> = ({ currentView, onChangeView }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             
-            {/* Logo & Navigation */}
             <div className="flex items-center space-x-8">
               <div className="flex items-center">
                 <span className="font-bold text-xl text-green-400 tracking-tight">Greenecom<span className="text-white">Hub</span></span>
               </div>
               
-              <nav className="hidden md:flex space-x-2">
-                <button
-                  onClick={() => onChangeView('cdn')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    currentView === 'cdn' 
-                      ? 'bg-gray-900 text-green-400 border border-gray-600' 
-                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                  }`}
-                >
-                  CDN Manager
-                </button>
-                <button
-                  onClick={() => onChangeView('pod_power')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    currentView === 'pod_power' 
-                      ? 'bg-gray-900 text-purple-400 border border-gray-600' 
-                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                  }`}
-                >
-                  POD Power
-                </button>
-              </nav>
+              {onChangeView && (
+                <nav className="hidden md:flex space-x-2">
+                  <button
+                    onClick={() => onChangeView('cdn')}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      currentView === 'cdn' 
+                        ? 'bg-gray-900 text-green-400 border border-gray-600' 
+                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                    }`}
+                  >
+                    CDN Manager
+                  </button>
+                  <button
+                    onClick={() => onChangeView('pod_power')}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      currentView === 'pod_power' 
+                        ? 'bg-gray-900 text-purple-400 border border-gray-600' 
+                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                    }`}
+                  >
+                    POD Power
+                  </button>
+                </nav>
+              )}
             </div>
 
-            {/* User Profile */}
             <div className="flex items-center space-x-4">
               <div className="hidden sm:flex flex-col items-end mr-2">
                 <span className="text-xs text-gray-400">Signed in as</span>
@@ -76,21 +75,22 @@ const Header: React.FC<HeaderProps> = ({ currentView, onChangeView }) => {
           </div>
         </div>
         
-        {/* Mobile Navigation Bar */}
-        <div className="md:hidden border-t border-gray-700 flex">
-             <button
-                onClick={() => onChangeView('cdn')}
-                className={`flex-1 py-3 text-center text-sm font-medium ${currentView === 'cdn' ? 'bg-gray-700 text-green-400' : 'text-gray-400'}`}
-            >
-                CDN Manager
-            </button>
-            <button
-                onClick={() => onChangeView('pod_power')}
-                className={`flex-1 py-3 text-center text-sm font-medium ${currentView === 'pod_power' ? 'bg-gray-700 text-purple-400' : 'text-gray-400'}`}
-            >
-                POD Power
-            </button>
-        </div>
+        {onChangeView && (
+          <div className="md:hidden border-t border-gray-700 flex">
+              <button
+                  onClick={() => onChangeView('cdn')}
+                  className={`flex-1 py-3 text-center text-sm font-medium ${currentView === 'cdn' ? 'bg-gray-700 text-green-400' : 'text-gray-400'}`}
+              >
+                  CDN Manager
+              </button>
+              <button
+                  onClick={() => onChangeView('pod_power')}
+                  className={`flex-1 py-3 text-center text-sm font-medium ${currentView === 'pod_power' ? 'bg-gray-700 text-purple-400' : 'text-gray-400'}`}
+              >
+                  POD Power
+              </button>
+          </div>
+        )}
       </header>
       <ChangePasswordModal 
         isOpen={isModalOpen}
