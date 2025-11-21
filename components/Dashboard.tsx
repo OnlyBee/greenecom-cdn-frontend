@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Folder, ImageFile, User } from '../types';
 import { Role } from '../types';
@@ -8,17 +7,14 @@ import UploadForm from './UploadForm';
 import ImageGrid from './ImageGrid';
 import AdminPanel from './AdminPanel';
 import FolderList from './FolderList';
-import PodPower from './PodPower'; // Import component mới
+import PodPower from './PodPower';
 import { api } from '../services/api';
 
 type ViewType = 'cdn' | 'pod_power';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  
-  // State để quản lý đang xem màn hình nào
   const [currentView, setCurrentView] = useState<ViewType>('cdn');
-
   const [folders, setFolders] = useState<Folder[]>([]);
   const [images, setImages] = useState<ImageFile[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
@@ -127,12 +123,10 @@ const Dashboard: React.FC = () => {
       <main className="flex-grow p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
           
-          {/* --- VIEW: POD POWER --- */}
           {currentView === 'pod_power' && (
              <PodPower />
           )}
 
-          {/* --- VIEW: CDN MANAGER --- */}
           {currentView === 'cdn' && (
             <>
                 {user?.role === Role.ADMIN && (
@@ -146,10 +140,6 @@ const Dashboard: React.FC = () => {
                             <div className="animate-pulse flex space-x-4">
                                 <div className="flex-1 space-y-4 py-1">
                                     <div className="h-4 bg-gray-700 rounded w-3/4"></div>
-                                    <div className="space-y-2">
-                                        <div className="h-4 bg-gray-700 rounded"></div>
-                                        <div className="h-4 bg-gray-700 rounded w-5/6"></div>
-                                    </div>
                                 </div>
                             </div>
                         ) : (
@@ -168,9 +158,6 @@ const Dashboard: React.FC = () => {
                         <div className="bg-gray-800 rounded-lg shadow-xl p-6 h-64 flex items-center justify-center border border-gray-700">
                             <div className="text-center">
                                 <p className="text-gray-400 text-lg mb-2">No Folder Selected</p>
-                                <p className="text-gray-500 text-sm">
-                                    {folders.length > 0 ? 'Select a folder from the list to view images.' : 'You are not assigned to any folders.'}
-                                </p>
                             </div>
                         </div>
                     ) : (
