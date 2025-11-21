@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { ImageUploader } from './ImageUploader';
-import { ImageGrid } from './ImageGrid';
-import { Spinner } from './Spinner';
+import { PodImageUploader } from './PodImageUploader';
+import { PodImageGrid } from './PodImageGrid';
+import { PodSpinner } from './PodSpinner';
 import { remakeMockups } from '../services/geminiService';
-import type { GeneratedImage, ApparelType } from '../types';
+import type { GeneratedImage, ApparelType } from '../podTypes';
 
 const APPAREL_TYPES: ApparelType[] = ['T-shirt', 'Hoodie', 'Sweater'];
 
@@ -12,7 +12,7 @@ interface MockupRemakerProps {
   onApiError: () => void;
 }
 
-export const MockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
+export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -75,7 +75,7 @@ export const MockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
   };
 
   const generateButtonText = () => {
-    if (isLoading) return <Spinner />;
+    if (isLoading) return <PodSpinner />;
     const numTypes = selectedApparelTypes.length;
     if (numTypes > 0) {
       const totalMockups = numTypes * 2;
@@ -85,16 +85,16 @@ export const MockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
   };
 
   return (
-    <div className="bg-base-200/50 p-6 sm:p-8 rounded-2xl shadow-xl">
+    <div className="bg-gray-800/50 p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-700">
       <h2 className="text-2xl font-bold text-center text-white mb-2">Remake Professional Mockups</h2>
-      <p className="text-center text-base-content mb-6">Generate two new mockups: one with a model and one flat-lay.</p>
+      <p className="text-center text-gray-400 mb-6">Generate two new mockups: one with a model and one flat-lay.</p>
       
-      <ImageUploader onFileSelect={handleFileSelect} previewUrl={previewUrl} />
+      <PodImageUploader onFileSelect={handleFileSelect} previewUrl={previewUrl} />
 
       {selectedFile && (
         <div className="mt-8">
           <h3 className="text-xl font-semibold text-center text-white mb-2">Choose Apparel Type(s) (Optional)</h3>
-          <p className="text-center text-base-content mb-4 text-sm">Default is to match the uploaded image type. You can select multiple.</p>
+          <p className="text-center text-gray-400 mb-4 text-sm">Default is to match the uploaded image type. You can select multiple.</p>
           <div className="flex flex-wrap justify-center gap-4 max-w-lg mx-auto">
             {APPAREL_TYPES.map((type) => {
               const isSelected = selectedApparelTypes.includes(type);
@@ -104,8 +104,8 @@ export const MockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
                   onClick={() => handleApparelSelect(type)}
                   className={`px-5 py-2 rounded-lg text-md font-semibold transition-all duration-200 border-2 ${
                     isSelected 
-                      ? 'bg-brand-primary border-brand-primary text-white ring-2 ring-offset-2 ring-offset-base-200 ring-brand-primary' 
-                      : `bg-base-300 border-transparent hover:border-brand-secondary text-base-content`
+                      ? 'bg-purple-600 border-purple-600 text-white ring-2 ring-offset-2 ring-offset-gray-800 ring-purple-600' 
+                      : `bg-gray-700 border-transparent hover:border-purple-400 text-gray-300`
                   }`}
                   aria-pressed={isSelected}
                 >
@@ -121,15 +121,15 @@ export const MockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
         <button
           onClick={handleGenerate}
           disabled={!selectedFile || isLoading}
-          className="bg-brand-primary hover:bg-brand-secondary disabled:bg-base-300 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg text-lg transition-all duration-300 shadow-lg flex items-center justify-center mx-auto min-w-[250px]"
+          className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg text-lg transition-all duration-300 shadow-lg flex items-center justify-center mx-auto min-w-[250px]"
         >
           {generateButtonText()}
         </button>
       </div>
 
-      {error && <p className="mt-4 text-center text-red-400">{error}</p>}
+      {error && <p className="mt-4 text-center text-red-400 bg-red-900/20 p-2 rounded">{error}</p>}
 
-      <ImageGrid images={generatedImages} />
+      <PodImageGrid images={generatedImages} />
     </div>
   );
 };
