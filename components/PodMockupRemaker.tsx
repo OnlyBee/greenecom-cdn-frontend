@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { PodImageUploader } from './PodImageUploader';
 import { PodImageGrid } from './PodImageGrid';
@@ -30,17 +29,12 @@ export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) =
 
   const handleApparelSelect = (type: ApparelType) => {
     setSelectedApparelTypes(prev => 
-      prev.includes(type) 
-        ? prev.filter(t => t !== type) 
-        : [...prev, type]
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
     );
   };
 
   const handleGenerate = async () => {
-    if (!selectedFile) {
-      setError("Vui lòng chọn một ảnh trước.");
-      return;
-    }
+    if (!selectedFile) return setError("Vui lòng chọn một ảnh trước.");
     
     setIsLoading(true);
     setError(null);
@@ -51,50 +45,26 @@ export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) =
       setGeneratedImages(images);
     } catch (err: any) {
       console.error(err);
-      let friendlyErrorMessage = "Đã xảy ra lỗi không xác định. Vui lòng thử lại.";
-      const rawErrorMessage = err.message || err.toString();
-      let triggerApiErrorFlow = false;
-
-      if (rawErrorMessage.includes("API key not found") || rawErrorMessage.toLowerCase().includes("api key") || rawErrorMessage.includes("400") || rawErrorMessage.includes("403")) {
-        friendlyErrorMessage = "API Key không hợp lệ hoặc đã bị thu hồi. Vui lòng nhập một key mới.";
-        triggerApiErrorFlow = true;
-      } else if (rawErrorMessage.includes("quota") || rawErrorMessage.includes("429")) {
-        friendlyErrorMessage = "Bạn đã vượt quá hạn mức sử dụng cho API Key này. Vui lòng nhập một key mới hoặc kiểm tra thông tin thanh toán.";
-        triggerApiErrorFlow = true;
+      const rawMsg = err.message || err.toString();
+      if (rawMsg.includes("API key") || rawMsg.includes("400") || rawMsg.includes("403")) {
+         onApiError();
+         setError("API Key lỗi.");
       } else {
-        friendlyErrorMessage = `Đã xảy ra lỗi khi tạo mockup. Chi tiết: ${rawErrorMessage}`;
-      }
-
-      setError(friendlyErrorMessage);
-      if (triggerApiErrorFlow) {
-        onApiError();
+         setError(`Lỗi: ${rawMsg}`);
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const generateButtonText = () => {
-    if (isLoading) return <PodSpinner />;
-    const numTypes = selectedApparelTypes.length;
-    if (numTypes > 0) {
-      const totalMockups = numTypes * 2;
-      return `Generate ${totalMockups} Mockup${totalMockups > 1 ? 's' : ''}`;
-    }
-    return 'Generate 2 Mockups';
-  };
-
   return (
     <div className="bg-gray-800/50 p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-700">
       <h2 className="text-2xl font-bold text-center text-white mb-2">Remake Professional Mockups</h2>
-      <p className="text-center text-gray-400 mb-6">Generate two new mockups: one with a model and one flat-lay.</p>
-      
       <PodImageUploader onFileSelect={handleFileSelect} previewUrl={previewUrl} />
 
       {selectedFile && (
         <div className="mt-8">
-          <h3 className="text-xl font-semibold text-center text-white mb-2">Choose Apparel Type(s) (Optional)</h3>
-          <p className="text-center text-gray-400 mb-4 text-sm">Default is to match the uploaded image type. You can select multiple.</p>
+          <h3 className="text-xl font-semibold text-center text-white mb-2">Choose Apparel Type(s)</h3>
           <div className="flex flex-wrap justify-center gap-4 max-w-lg mx-auto">
             {APPAREL_TYPES.map((type) => {
               const isSelected = selectedApparelTypes.includes(type);
@@ -104,10 +74,9 @@ export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) =
                   onClick={() => handleApparelSelect(type)}
                   className={`px-5 py-2 rounded-lg text-md font-semibold transition-all duration-200 border-2 ${
                     isSelected 
-                      ? 'bg-purple-600 border-purple-600 text-white ring-2 ring-offset-2 ring-offset-gray-800 ring-purple-600' 
+                      ? 'bg-purple-600 border-purple-600 text-white' 
                       : `bg-gray-700 border-transparent hover:border-purple-400 text-gray-300`
                   }`}
-                  aria-pressed={isSelected}
                 >
                   {type}
                 </button>
@@ -121,14 +90,12 @@ export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) =
         <button
           onClick={handleGenerate}
           disabled={!selectedFile || isLoading}
-          className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg text-lg transition-all duration-300 shadow-lg flex items-center justify-center mx-auto min-w-[250px]"
+          className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg text-lg shadow-lg flex items-center justify-center mx-auto min-w-[250px]"
         >
-          {generateButtonText()}
+          {isLoading ? <PodSpinner /> : 'Generate'}
         </button>
       </div>
-
       {error && <p className="mt-4 text-center text-red-400 bg-red-900/20 p-2 rounded">{error}</p>}
-
       <PodImageGrid images={generatedImages} />
     </div>
   );
