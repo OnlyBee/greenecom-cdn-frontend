@@ -1,0 +1,103 @@
+import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
+
+type Role = 'ADMIN' | 'MEMBER' | string;
+
+export type User = {
+  id: string;
+  username: string;
+  role: Role;
+};
+
+export type AuthContextType = {
+  user: User | null;
+  token: string | null;
+  loading: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
+};
+
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const TOKEN_KEY = 'greenecom_token';
+const USER_KEY = 'greenecom_user';
+
+type DecodedToken = {
+  id: string;
+  role: Role;
+  username?: string;
+  exp: number;
+};
+
+function decodeToken(token: string): DecodedToken | null {
+  try {
+    const [, payload] = token.split('.');
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem(TOKEN_KEY);
+    if (storedToken) {
+      const decoded = decodeToken(storedToken);
+      if (decoded && decoded.id && decoded.exp * 1000 > Date.now()) {
+        setToken(storedToken);
+        let username = decoded.username || 'User';
+        try {
+             const oldUserStorage = JSON.parse(localStorage.getItem(USER_KEY) || '{}');
+             if (oldUserStorage.username) username = oldUserStorage.username;
+        } catch {}
+        setUser({ id: decoded.id, role: decoded.role, username });
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+      }
+    }
+    setLoading(false);
+  }, []);
+
+  const login = async (username: string, password: string) => {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'Login failed');
+    
+    const decoded = decodeToken(data.token);
+    if (!decoded) throw new Error('Invalid token');
+
+    const newUser = { id: decoded.id, username: data.username, role: decoded.role };
+    setToken(data.token);
+    setUser(newUser);
+    localStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+  };
+
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuthContext = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuthContext must be used within AuthProvider');
+  return ctx;
+};
