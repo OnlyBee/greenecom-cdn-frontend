@@ -1,10 +1,10 @@
 {
   "name": "greenecom-cdn-manager",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,7 @@
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@google/genai": "^0.1.1"
+    "@google/genai": "^0.2.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
