@@ -18,6 +18,7 @@ export type User = {
 export type AuthContextType = {
   user: User | null;
   token: string | null;
+  loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 };
@@ -49,6 +50,7 @@ function decodeToken(token: string): DecodedToken | null {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Load lại từ localStorage khi F5
   useEffect(() => {
@@ -88,6 +90,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(null);
       }
     }
+    setLoading(false);
   }, []);
 
   const login = async (username: string, password: string) => {
@@ -136,6 +139,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const value: AuthContextType = {
     user,
     token,
+    loading,
     login,
     logout,
   };

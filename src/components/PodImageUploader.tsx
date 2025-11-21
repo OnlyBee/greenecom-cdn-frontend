@@ -26,7 +26,10 @@ export const PodImageUploader: React.FC<ImageUploaderProps> = ({ onFileSelect, p
     e.stopPropagation();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      onFileSelect(e.dataTransfer.files[0]);
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+          onFileSelect(file);
+      }
     }
   }, [onFileSelect]);
 
@@ -45,7 +48,7 @@ export const PodImageUploader: React.FC<ImageUploaderProps> = ({ onFileSelect, p
             <img src={previewUrl} alt="Preview" className="max-h-full max-w-full object-contain rounded-lg" />
         ) : (
             <div className="text-center p-4">
-                <p className="text-lg font-semibold text-gray-300">Drag & drop or click</p>
+                <p className="text-lg font-semibold text-gray-300">Drag & drop or click to upload</p>
             </div>
         )}
         <input type="file" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" />
