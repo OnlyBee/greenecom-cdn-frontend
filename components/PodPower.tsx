@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { PodFeatureSelector } from './PodFeatureSelector';
 import { PodVariationGenerator } from './PodVariationGenerator';
@@ -35,16 +34,10 @@ const PodPower: React.FC = () => {
 
   return (
     <div className="min-h-screen text-gray-100 font-sans relative">
-      
-      {/* Nếu chưa có key thì hiển thị modal đè lên trên */}
       {(!apiKey || isApiKeyModalOpen) && (
           <PodApiKeyModal
             isOpen={true}
-            onClose={() => { 
-                // Chỉ cho phép đóng nếu đã có key (để xem giao diện mà không dùng tính năng)
-                // Nhưng ở đây ta force user nhập
-                if (apiKey) setIsApiKeyModalOpen(false);
-            }}
+            onClose={() => { if (apiKey) setIsApiKeyModalOpen(false); }}
             onSave={handleSaveApiKey}
           />
       )}
