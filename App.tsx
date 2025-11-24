@@ -9,7 +9,7 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 flex items-center justify-center">
-        <p className="text-sm text-gray-300">Loading...</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
       </div>
     );
   }
