@@ -23,10 +23,10 @@ export const VARIATION_COLORS: Color[] = [
 
 export const MOCKUP_PROPS: string[] = [
   "Mug",
-  "Plaid scarf (random color)",
+  "Plaid scarf",
   "Towel",
   "Flower pot",
-  "Small cactus pot",
+  "Small cactus",
   "Books",
   "Pen",
   "Sneakers",

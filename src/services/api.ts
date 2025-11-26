@@ -94,7 +94,7 @@ export const api = {
   deleteUser: (userId: string) => request<void>(`/users/${userId}`, { method: 'DELETE' }),
   deleteFolder: (folderId: string) => request<void>(`/folders/${folderId}`, { method: 'DELETE' }),
 
-  // Stats
+  // Stats Tracking
   recordUsage: (feature: string) => request<void>('/stats/record', { method: 'POST', body: JSON.stringify({ feature }) }),
   getStats: () => request<any[]>('/stats'),
 };

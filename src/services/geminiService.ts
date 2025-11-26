@@ -41,7 +41,6 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
 };
 
 const getRandomProps = (): string => {
-    // Shuffle and take 3 unique items
     const shuffled = [...MOCKUP_PROPS].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, 3).join(", "); 
 };
@@ -49,10 +48,14 @@ const getRandomProps = (): string => {
 export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
   const imagePart = await fileToGenerativePart(file);
   const promises = selectedColors.map(async (color) => {
-    const prompt = `Analyze the apparel in the provided image. The design on the apparel must be preserved perfectly. The task is to change ONLY the color of the apparel itself to '${color.name}'. Do not alter the background, any other objects, or the design printed on the apparel. The output must be an image.`;
+    const prompt = `Analyze the apparel in the provided image. The design/artwork on the apparel must be preserved EXACTLY as is. 
+    TASK: Change ONLY the fabric color of the apparel to '${color.name}'. 
+    CONSTRAINT: Do NOT change the background. Do NOT change the design. Keep the lighting and shadows realistic.`;
+    
     try {
         const src = await generateImage(imagePart, prompt);
-        api.recordUsage('variation').catch(e => console.error(e));
+        // Track usage silently
+        api.recordUsage('variation').catch(e => console.error("Tracking error:", e));
         return { src, name: `${color.name}.png` };
     } catch (e) { throw e; }
   });
@@ -63,23 +66,24 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
     const imagePart = await fileToGenerativePart(file);
     
     const createMockupPromises = (apparelType: ApparelType | null): Promise<GeneratedImage>[] => {
-        const basePrompt = `Analyze the apparel in the provided image to identify its color and the graphic design printed on it. These elements must be preserved perfectly.`;
-        const apparelTypeInstruction = apparelType
-            ? `The new mockup must feature a '${apparelType}'.`
-            : `The new mockup must feature the same type of apparel.`;
+        const basePrompt = `Analyze the provided image. Identify the graphic design/artwork on the chest. You MUST preserve this design exactly in the new image.`;
+        const typeText = apparelType ? apparelType : "apparel";
 
         // MODEL PROMPT (Close-up focus)
-        const modelPrompt = `${basePrompt} ${apparelTypeInstruction} Create a new, photorealistic mockup image of a person wearing this apparel.
-        ZOOM LEVEL: EXTREME CLOSE-UP. Focus tightly on the chest area where the design is. The graphic design must be huge, clear, and readable. Do NOT show legs or full body. Neutral, clean background.`;
+        const modelPrompt = `${basePrompt}
+        TASK: Generate a photorealistic mockup of a model wearing a ${typeText}.
+        ZOOM: EXTREME CLOSE-UP on the torso/chest area. The design must be LARGE, CLEAR, and CENTERED. Do not show legs.
+        STYLE: Professional, clean, studio lighting. Neutral background.`;
 
         // FLAT LAY PROMPT (Random Props + Close-up)
         const randomProps = getRandomProps();
-        const flatLayPrompt = `${basePrompt} ${apparelTypeInstruction} Create a new, photorealistic flat-lay mockup image.
+        const flatLayPrompt = `${basePrompt}
+        TASK: Generate a photorealistic flat-lay mockup of a ${typeText} placed on a wooden or marble surface.
         
-        MANDATORY DECORATION: You MUST include these specific items placed randomly around the apparel: ${randomProps}. 
-        Ensure these items are visible but do not cover the design.
+        CRITICAL REQUIREMENT - PROPS: You MUST place these items randomly around the ${typeText} to create a cozy composition: ${randomProps}.
+        The props must be visible but must NOT cover the design on the shirt.
         
-        ZOOM LEVEL: EXTREME CLOSE-UP. Frame the image very tightly around the apparel. The design must be the central focus and very sharp.`;
+        ZOOM: CLOSE-UP view. Frame the image tightly around the folded ${typeText}. The design must be the main focus.`;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
         
