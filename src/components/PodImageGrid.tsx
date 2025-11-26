@@ -1,126 +1,128 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import type { GeneratedImage } from '../podTypes';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+
+const DownloadIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+);
+
+const PreviewIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+);
+
+const CloseIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+);
 
 interface ImageGridProps {
   images: GeneratedImage[];
 }
 
-// Icons
-const EyeIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-        <circle cx="12" cy="12" r="3"/>
-    </svg>
-);
-
-const DownloadIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/>
-        <line x1="12" y1="15" x2="12" y2="3"/>
-    </svg>
-);
-
-const CloseIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="18" y1="6" x2="6" y2="18"/>
-        <line x1="6" y1="6" x2="18" y2="18"/>
-    </svg>
-);
-
-export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
+export const ImageGrid: React.FC<ImageGridProps> = ({ images }) => {
   const [previewImage, setPreviewImage] = useState<GeneratedImage | null>(null);
-  const [isZipping, setIsZipping] = useState(false);
 
-  if (!images || images.length === 0) return null;
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            setPreviewImage(null);
+        }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
 
-  const handleDownloadAll = async () => {
-    setIsZipping(true);
-    const zip = new JSZip();
-    try {
-        const promises = images.map(async (img) => {
-            const res = await fetch(img.src);
-            const blob = await res.blob();
-            zip.file(img.name, blob);
-        });
-        await Promise.all(promises);
-        const content = await zip.generateAsync({ type: "blob" });
-        saveAs(content, "pod_power_results.zip");
-    } catch (e) {
-        alert("Failed to zip files.");
-    } finally {
-        setIsZipping(false);
-    }
+  if (!images.length) {
+    return null;
+  }
+
+  const handleDownloadAll = () => {
+    images.forEach((image, index) => {
+      // Add a small delay to prevent the browser from blocking multiple downloads
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = image.src;
+        link.download = image.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, index * 250); // 250ms delay between each download trigger
+    });
   };
 
   return (
-    <div className="mt-12 pt-8 w-full">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 bg-gray-800 p-4 rounded-xl border border-gray-700">
-          <h2 className="text-2xl font-bold text-white">Results ({images.length})</h2>
-          <button 
-            onClick={handleDownloadAll} 
-            disabled={isZipping}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-transform transform hover:scale-105"
-          >
-            <DownloadIcon />
-            {isZipping ? 'Compressing Images...' : 'DOWNLOAD ALL (.ZIP)'}
-          </button>
+    <div className="mt-12">
+      <div className="flex flex-col sm:flex-row justify-center items-center text-center gap-4 mb-6">
+        <h2 className="text-2xl font-bold">Generated Images</h2>
+        <button
+          onClick={handleDownloadAll}
+          className="bg-brand-secondary hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-base-100 focus:ring-brand-secondary"
+          aria-label={`Download all ${images.length} generated images`}
+        >
+          <DownloadIcon />
+          <span>Download All ({images.length})</span>
+        </button>
       </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {images.map((image, index) => (
-          <div key={index} className="relative bg-gray-800 rounded-xl overflow-hidden shadow-xl border border-gray-700 aspect-square flex flex-col">
-            <img 
-                src={image.src} 
-                alt={image.name} 
-                className="w-full h-full object-cover cursor-pointer"
+          <div key={index} className="group relative rounded-lg overflow-hidden shadow-lg bg-base-200 aspect-square">
+            <img src={image.src} alt={`Generated mockup: ${image.name}`} className="w-full h-full object-contain" />
+            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-all duration-300 flex items-center justify-center gap-4">
+              <button
                 onClick={() => setPreviewImage(image)}
-            />
-            
-            {/* Preview Button (Always Visible) */}
-            <button 
-                onClick={() => setPreviewImage(image)}
-                className="absolute top-2 right-2 bg-black/70 hover:bg-black text-white p-2 rounded-full backdrop-blur-md transition-all z-10"
-                title="Preview Full Size"
-            >
-                <EyeIcon />
-            </button>
-
-            {/* Download Single Button (Always Visible at bottom) */}
-            <div className="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
-                <a 
-                    href={image.src} 
-                    download={image.name} 
-                    className="bg-purple-600 hover:bg-purple-700 text-white w-full py-2 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg text-sm"
-                >
-                    <DownloadIcon /> Download
-                </a>
+                aria-label={`Preview image ${image.name}`}
+                className="opacity-0 group-hover:opacity-100 transform group-hover:scale-100 scale-90 transition-all duration-300 bg-white text-gray-800 p-3 rounded-full shadow-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:ring-white"
+              >
+                 <PreviewIcon />
+              </button>
+              <a
+                href={image.src}
+                download={image.name}
+                aria-label={`Download image ${image.name}`}
+                className="opacity-0 group-hover:opacity-100 transform group-hover:scale-100 scale-90 transition-all duration-300 bg-brand-primary text-white p-3 rounded-full shadow-lg hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:ring-brand-primary"
+              >
+                <DownloadIcon />
+              </a>
             </div>
           </div>
         ))}
       </div>
 
-      {/* PREVIEW MODAL */}
+      {/* Lightbox / Preview Modal */}
       {previewImage && (
-        <div 
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-4"
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-4 transition-opacity duration-300"
             onClick={() => setPreviewImage(null)}
-        >
-            <button 
-                onClick={() => setPreviewImage(null)} 
-                className="absolute top-6 right-6 text-gray-400 hover:text-white bg-gray-800 p-3 rounded-full border border-gray-600"
-            >
-                <CloseIcon />
-            </button>
-            <img 
-                src={previewImage.src} 
-                alt={previewImage.name} 
-                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl border border-gray-800" 
-                onClick={e => e.stopPropagation()}
-            />
-        </div>
+          >
+              <button 
+                className="absolute top-4 right-4 text-white hover:text-brand-primary transition-colors z-50 bg-black/50 rounded-full p-1"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewImage(null);
+                }}
+              >
+                  <CloseIcon />
+              </button>
+              <div 
+                className="relative max-w-[95vw] max-h-[95vh] overflow-hidden rounded-lg shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                  <img 
+                    src={previewImage.src} 
+                    alt={previewImage.name} 
+                    className="max-w-full max-h-[90vh] object-contain" 
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-center backdrop-blur-sm">
+                      {previewImage.name}
+                  </div>
+              </div>
+          </div>
       )}
     </div>
   );
