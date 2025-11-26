@@ -1,6 +1,6 @@
 
 import React from 'react';
-import type { Feature } from '../podTypes';
+import type { Feature } from '../PodTypes';
 
 interface FeatureSelectorProps {
   selectedFeature: Feature;

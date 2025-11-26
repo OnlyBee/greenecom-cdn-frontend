@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import type { GeneratedImage, Color, ApparelType } from "../podTypes";
+import type { GeneratedImage, Color, ApparelType } from "../PodTypes";
 import { getApiKey } from '../utils/apiKey';
 
 const fileToGenerativePart = async (file: File) => {

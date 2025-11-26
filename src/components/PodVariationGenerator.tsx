@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
-import { ImageUploader } from './podImageUploader';
-import { ImageGrid } from './podImageGrid';
-import { Spinner } from './podSpinner';
+import { ImageUploader } from './PodImageUploader';
+import { ImageGrid } from './PodImageGrid';
+import { Spinner } from './PodSpinner';
 import { generateVariations } from '../services/geminiService';
-import { VARIATION_COLORS } from '../podConstants';
-import type { GeneratedImage, Color } from '../podTypes';
+import { VARIATION_COLORS } from '../PodConstants';
+import type { GeneratedImage, Color } from '../PodTypes';
 
 interface VariationGeneratorProps {
   onApiError: () => void;

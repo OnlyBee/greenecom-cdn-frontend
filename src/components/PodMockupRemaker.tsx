@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { ImageUploader } from './podImageUploader';
-import { ImageGrid } from './podImageGrid';
-import { Spinner } from './podSpinner';
+import { ImageUploader } from './PodImageUploader';
+import { ImageGrid } from './PodImageGrid';
+import { Spinner } from './PodSpinner';
 import { remakeMockups } from '../services/geminiService';
-import type { GeneratedImage, ApparelType } from '../podTypes';
+import type { GeneratedImage, ApparelType } from '../PodTypes';
 
 const APPAREL_TYPES: ApparelType[] = ['T-shirt', 'Hoodie', 'Sweater'];
 
