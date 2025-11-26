@@ -1,3 +1,4 @@
+
 const API_KEY_STORAGE_KEY = 'gemini-api-key';
 
 export const getApiKey = (): string | null => {

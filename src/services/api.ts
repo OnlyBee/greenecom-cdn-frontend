@@ -1,3 +1,4 @@
+
 import type { User, Folder, ImageFile } from '../types';
 
 const API_BASE_URL = '/api';
@@ -5,9 +6,11 @@ const API_BASE_URL = '/api';
 const getToken = () => localStorage.getItem('greenecom_token');
 
 const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
-  const headers: HeadersInit = {
-    any
+  // Fix TypeScript error by casting to any to allow dynamic header assignment
+  const headers: any = {
+    ...options.headers,
   };
+  
   const token = getToken();
   if (token && !(options.body instanceof FormData)) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -73,7 +76,7 @@ export const api = {
     formData.append('image', file);
     
     const token = getToken();
-    const headers: HeadersInit = {};
+    const headers: any = {};
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
     }
