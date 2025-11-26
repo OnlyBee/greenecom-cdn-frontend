@@ -1,4 +1,3 @@
-
 import type { Color } from './podTypes';
 
 export const VARIATION_COLORS: Color[] = [
@@ -18,26 +17,25 @@ export const VARIATION_COLORS: Color[] = [
   { name: "Charcoal", value: "CHARCOAL", hex: "#36454F" },
   { name: "Dark Heather", value: "DARK HEATHER", hex: "#424242" },
   { name: "Purple", value: "PURPLE", hex: "#800080" },
-  { name: "Orange", value: "ORANGE", hex: "#FFA500" },
+  { name: "Orange", value: "ORANGE", hex: "#FFA500" }
 ];
 
 export const MOCKUP_PROPS: string[] = [
-  "a ceramic coffee Mug",
-  "a checkered plaid scarf",
-  "a folded soft Towel",
-  "a green Potted Plant",
-  "a small Cactus",
-  "open vintage Books",
-  "a luxury Pen",
-  "white canvas Sneakers",
-  "a Marshall Speaker",
-  "a beige bucket hat",
-  "a baseball cap",
-  "fresh Daisy flowers",
-  "a red Rose",
-  "dried Eucalyptus leaves",
-  "blue denim Jeans",
-  "gold chain Necklace",
-  "a wooden picture frame",
-  "sunglasses"
+  "a ceramic Mug", // Mug
+  "a random colored plaid scarf", // khăn caro màu ngẫu nhiên
+  "a plain soft towel", // khăn thường
+  "a flower pot", // chậu hoa
+  "a small cactus pot", // chậu hoa xương rông nhỏ
+  "vintage books", // sách
+  "a pen", // bút
+  "sneakers", // giày sneaker
+  "a bluetooth speaker", // loa
+  "a wide-brim hat", // mũ vành
+  "a baseball cap", // mũ lưỡi trai
+  "daisy flowers", // bông cúc
+  "roses", // hoa hồng
+  "a tree branch", // nhành cây
+  "blue jeans", // quần jean
+  "a necklace", // dây chuyền
+  "a photo frame" // khung ảnh
 ];

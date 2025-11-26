@@ -250,7 +250,6 @@ app.post(['/stats/record', '/api/stats/record'], authenticateToken, async (req, 
 });
 
 app.get(['/stats', '/api/stats'], authenticateToken, async (req, res) => {
-    // Allow all users to fetch stats for now to verify visibility
     try {
         const result = await pool.query(`
             SELECT u.username, 
