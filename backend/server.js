@@ -1,3 +1,4 @@
+
 // backend/server.js
 
 require('dotenv').config();
@@ -465,6 +466,14 @@ app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, re
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });
   } finally { client.release(); }
+});
+
+// STATS
+app.post(['/stats/record', '/api/stats/record'], authenticateToken, (req, res) => {
+  // Placeholder: In a real app, insert into a 'stats' table
+  // const { feature } = req.body;
+  // pool.query('INSERT INTO stats (user_id, feature, used_at) VALUES ($1, $2, NOW())', [req.user.id, feature]);
+  res.json({ success: true });
 });
 
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));

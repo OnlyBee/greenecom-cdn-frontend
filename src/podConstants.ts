@@ -35,3 +35,23 @@ export const VARIATION_COLORS: Color[] = [
   { name: "Violet", value: "VIOLET", hex: "#8F00FF" },
   { name: "Yellow Haze", value: "YELLOW HAZE", hex: "#FCE205" },
 ];
+
+export const MOCKUP_PROPS: string[] = [
+  "Mug",
+  "Plaid scarf (random color)",
+  "Towel",
+  "Flower pot",
+  "Small cactus pot",
+  "Books",
+  "Pen",
+  "Sneakers",
+  "Speaker",
+  "Bucket hat",
+  "Baseball cap",
+  "Daisy flower",
+  "Rose flower",
+  "Tree branch",
+  "Jeans",
+  "Necklace",
+  "Photo frame"
+];

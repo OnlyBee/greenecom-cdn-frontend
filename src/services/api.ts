@@ -145,4 +145,9 @@ export const api = {
   deleteFolder: (folderId: string) => request<void>(`/folders/${folderId}`, {
     method: 'DELETE',
   }),
+
+  recordUsage: (feature: string) => request<void>('/stats/record', {
+    method: 'POST',
+    body: JSON.stringify({ feature }),
+  }),
 };
