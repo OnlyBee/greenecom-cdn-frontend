@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import type { GeneratedImage, Color, ApparelType } from "../podTypes";
 import { getApiKey } from '../utils/apiKey';
@@ -40,8 +41,9 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
 };
 
 const getRandomProps = (): string => {
+    // Shuffle and take 3 unique items
     const shuffled = [...MOCKUP_PROPS].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, 3).join(", "); // Take 3 items
+    return shuffled.slice(0, 3).join(", "); 
 };
 
 export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
@@ -68,13 +70,16 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
 
         // MODEL PROMPT (Close-up focus)
         const modelPrompt = `${basePrompt} ${apparelTypeInstruction} Create a new, photorealistic mockup image of a person wearing this apparel.
-        ZOOM LEVEL: Extreme Close-up. Focus tightly on the chest/torso area where the design is. The design must be the main subject, large and clear. Do not show the full body. Neutral background.`;
+        ZOOM LEVEL: EXTREME CLOSE-UP. Focus tightly on the chest area where the design is. The graphic design must be huge, clear, and readable. Do NOT show legs or full body. Neutral, clean background.`;
 
         // FLAT LAY PROMPT (Random Props + Close-up)
         const randomProps = getRandomProps();
         const flatLayPrompt = `${basePrompt} ${apparelTypeInstruction} Create a new, photorealistic flat-lay mockup image.
-        DECOR: Place these items randomly around the apparel to create a lively scene: ${randomProps}.
-        ZOOM LEVEL: Extreme Close-up. Frame the image very tightly around the apparel's design area. The design must be distinct and sharp. Ensure props do not cover the design.`;
+        
+        MANDATORY DECORATION: You MUST include these specific items placed randomly around the apparel: ${randomProps}. 
+        Ensure these items are visible but do not cover the design.
+        
+        ZOOM LEVEL: EXTREME CLOSE-UP. Frame the image very tightly around the apparel. The design must be the central focus and very sharp.`;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
         
