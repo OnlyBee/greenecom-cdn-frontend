@@ -6,10 +6,7 @@ const API_BASE_URL = '/api';
 const getToken = () => localStorage.getItem('greenecom_token');
 
 const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
-  // Fix TypeScript error by using 'any' for headers construction
-  const headers: any = {
-    ...options.headers,
-  };
+  const headers: any = { ...options.headers };
   
   const token = getToken();
   if (token && !(options.body instanceof FormData)) {
@@ -20,11 +17,7 @@ const request = async <T>(url: string, options: RequestInit = {}): Promise<T> =>
   }
 
   const endpoint = url.startsWith('/') ? url : `/${url}`;
-  
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
 
   if (!response.ok) {
     let errorMsg = `HTTP error! status: ${response.status}`;
@@ -35,10 +28,7 @@ const request = async <T>(url: string, options: RequestInit = {}): Promise<T> =>
     throw new Error(errorMsg);
   }
   
-  if (response.status === 204) {
-      return null as T;
-  }
-
+  if (response.status === 204) return null as T;
   return response.json();
 };
 
@@ -77,77 +67,34 @@ export const api = {
     
     const token = getToken();
     const headers: any = {};
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${API_BASE_URL}/upload`, {
-        method: 'POST',
-        headers,
-        body: formData,
-    });
+    const response = await fetch(`${API_BASE_URL}/upload`, { method: 'POST', headers, body: formData });
      if (!response.ok) {
         let errorMsg = 'Upload failed';
         try {
             const errorData = await response.json();
             errorMsg = errorData.error || errorData.message || `Server Error: ${errorData.code || response.status}`;
-        } catch (e) {
-            errorMsg = `Upload failed (Status: ${response.status})`;
-        }
+        } catch (e) { errorMsg = `Upload failed (Status: ${response.status})`; }
         throw new Error(errorMsg);
     }
   },
 
   async uploadImageUrl(imageUrl: string, folderId: string): Promise<void> {
-      return request<void>('/upload/url', {
-          method: 'POST',
-          body: JSON.stringify({ folderId, imageUrl })
-      });
+      return request<void>('/upload/url', { method: 'POST', body: JSON.stringify({ folderId, imageUrl }) });
   },
 
-  renameImage: (imageId: string, newName: string) => request<ImageFile>(`/images/${imageId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ name: newName })
-  }),
+  renameImage: (imageId: string, newName: string) => request<ImageFile>(`/images/${imageId}`, { method: 'PUT', body: JSON.stringify({ name: newName }) }),
+  createUser: (username: string, password: string) => request<User>('/users', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  createFolder: (name: string) => request<Folder>('/folders', { method: 'POST', body: JSON.stringify({ name }) }),
+  assignUserToFolder: (userId: string, folderId: string) => request<void>('/folders/assign', { method: 'POST', body: JSON.stringify({ userId, folderId }) }),
+  unassignUserFromFolder: (userId: string, folderId: string) => request<void>(`/folders/${folderId}/users/${userId}`, { method: 'DELETE' }),
+  changePassword: (currentPassword: string, newPassword: string) => request<void>('/users/change-password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) }),
+  deleteImage: (imageId: string) => request<void>(`/images/${imageId}`, { method: 'DELETE' }),
+  deleteUser: (userId: string) => request<void>(`/users/${userId}`, { method: 'DELETE' }),
+  deleteFolder: (folderId: string) => request<void>(`/folders/${folderId}`, { method: 'DELETE' }),
 
-  createUser: (username: string, password: string) => request<User>('/users', {
-    method: 'POST',
-    body: JSON.stringify({ username, password }),
-  }),
-
-  createFolder: (name: string) => request<Folder>('/folders', {
-    method: 'POST',
-    body: JSON.stringify({ name }),
-  }),
-
-  assignUserToFolder: (userId: string, folderId: string) => request<void>('/folders/assign', {
-    method: 'POST',
-    body: JSON.stringify({ userId, folderId }),
-  }),
-
-  unassignUserFromFolder: (userId: string, folderId: string) => request<void>(`/folders/${folderId}/users/${userId}`, {
-    method: 'DELETE',
-  }),
-
-  changePassword: (currentPassword: string, newPassword: string) => request<void>('/users/change-password', {
-    method: 'PUT',
-    body: JSON.stringify({ currentPassword, newPassword }),
-  }),
-  
-  deleteImage: (imageId: string) => request<void>(`/images/${imageId}`, {
-    method: 'DELETE',
-  }),
-
-  deleteUser: (userId: string) => request<void>(`/users/${userId}`, {
-    method: 'DELETE',
-  }),
-
-  deleteFolder: (folderId: string) => request<void>(`/folders/${folderId}`, {
-    method: 'DELETE',
-  }),
-
-  recordUsage: (feature: string) => request<void>('/stats/record', {
-    method: 'POST',
-    body: JSON.stringify({ feature }),
-  }),
+  // Stats
+  recordUsage: (feature: string) => request<void>('/stats/record', { method: 'POST', body: JSON.stringify({ feature }) }),
+  getStats: () => request<any[]>('/stats'),
 };

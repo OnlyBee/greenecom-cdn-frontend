@@ -1,9 +1,8 @@
-
 import { GoogleGenAI } from "@google/genai";
 import type { GeneratedImage, Color, ApparelType } from "../podTypes";
 import { getApiKey } from '../utils/apiKey';
 import { MOCKUP_PROPS } from '../podConstants';
-import { api } from './api'; // Import api to call stats
+import { api } from './api';
 
 const fileToGenerativePart = async (file: File) => {
   const base64EncodedDataPromise = new Promise<string>((resolve) => {
@@ -26,26 +25,23 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: {
-            parts: [imagePart, { text: prompt }],
-        },
+        contents: { parts: [imagePart, { text: prompt }] },
     });
 
-    const firstPart = response.candidates?.[0]?.content?.parts?.[0];
-    if (firstPart && 'inlineData' in firstPart && firstPart.inlineData) {
-        return `data:${firstPart.inlineData.mimeType};base64,${firstPart.inlineData.data}`;
+    const parts = response.candidates?.[0]?.content?.parts;
+    if (parts) {
+        for (const part of parts) {
+            if (part.inlineData) {
+                return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            }
+        }
     }
     throw new Error("No image was generated.");
 };
 
-// Helper to get random props
 const getRandomProps = (): string => {
-    // Shuffle array
     const shuffled = [...MOCKUP_PROPS].sort(() => 0.5 - Math.random());
-    // Get 2 to 3 items
-    const count = Math.floor(Math.random() * 2) + 2; // 2 or 3
-    const selected = shuffled.slice(0, count);
-    return selected.join(", ");
+    return shuffled.slice(0, 3).join(", "); // Take 3 items
 };
 
 export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
@@ -54,12 +50,9 @@ export const generateVariations = async (file: File, selectedColors: Color[]): P
     const prompt = `Analyze the apparel in the provided image. The design on the apparel must be preserved perfectly. The task is to change ONLY the color of the apparel itself to '${color.name}'. Do not alter the background, any other objects, or the design printed on the apparel. The output must be an image.`;
     try {
         const src = await generateImage(imagePart, prompt);
-        // Track success
-        api.recordUsage('variation').catch(e => console.error("Stats error", e));
+        api.recordUsage('variation').catch(e => console.error(e));
         return { src, name: `${color.name}.png` };
-    } catch (e) {
-        throw e; // Propagate error to UI
-    }
+    } catch (e) { throw e; }
   });
   return Promise.all(promises);
 };
@@ -75,26 +68,23 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
 
         // MODEL PROMPT (Close-up focus)
         const modelPrompt = `${basePrompt} ${apparelTypeInstruction} Create a new, photorealistic mockup image of a person wearing this apparel.
-        IMPORTANT: This must be a CLOSE-UP shot focusing strictly on the chest/torso area where the graphic design is located. 
-        Zoom in significantly so the design details are perfectly visible, sharp, and readable. 
-        Do not include the full body, focus on the upper body and the design. Neutral background.`;
+        ZOOM LEVEL: Extreme Close-up. Focus tightly on the chest/torso area where the design is. The design must be the main subject, large and clear. Do not show the full body. Neutral background.`;
 
-        // FLAT LAY PROMPT (Props + Close-up focus)
+        // FLAT LAY PROMPT (Random Props + Close-up)
         const randomProps = getRandomProps();
         const flatLayPrompt = `${basePrompt} ${apparelTypeInstruction} Create a new, photorealistic flat-lay mockup image.
-        Aesthetic decor: Randomly place these items around the apparel frame to make it lively: ${randomProps}.
-        IMPORTANT: Ensure these props DO NOT cover or obscure the graphic design on the apparel.
-        ZOOM LEVEL: Close-up. Frame the image tightly around the apparel's design area so the artwork is the main focus and very detailed.`;
+        DECOR: Place these items randomly around the apparel to create a lively scene: ${randomProps}.
+        ZOOM LEVEL: Extreme Close-up. Frame the image very tightly around the apparel's design area. The design must be distinct and sharp. Ensure props do not cover the design.`;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
         
         const modelPromise = generateImage(imagePart, modelPrompt).then(src => {
-            api.recordUsage('mockup').catch(e => console.error("Stats error", e));
+            api.recordUsage('mockup').catch(e => console.error(e));
             return { src, name: `model${nameSuffix}_mockup.png` };
         });
         
         const flatLayPromise = generateImage(imagePart, flatLayPrompt).then(src => {
-            api.recordUsage('mockup').catch(e => console.error("Stats error", e));
+            api.recordUsage('mockup').catch(e => console.error(e));
             return { src, name: `flatlay${nameSuffix}_mockup.png` };
         });
 
