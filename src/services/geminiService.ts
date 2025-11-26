@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import type { GeneratedImage, Color, ApparelType } from "../podTypes";
 import { getApiKey } from '../utils/apiKey';
@@ -30,7 +29,7 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
         contents: { parts: [imagePart, { text: prompt }] },
     });
 
-    // Safe check for response structure
+    // FIX: Added optional chaining (?.) to avoid 'Object is possibly undefined' error
     const candidates = response.candidates;
     if (candidates && candidates.length > 0 && candidates[0].content?.parts) {
         for (const part of candidates[0].content.parts) {
@@ -81,28 +80,29 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         
         // 1. MODEL PROMPT (Lifestyle)
         const modelPrompt = `
-        ROLE: Fashion Photographer.
-        OBJECT: A realistic model wearing a ${typeText}.
-        DESIGN: Apply the artwork from the source image onto the chest of the ${typeText}.
-        SCENE: Urban street or cozy cafe background (Blurred).
-        CAMERA: Portrait shot, Close-up on the torso.
-        REQUIREMENT:
-        - The artwork must be LARGE, CLEAR, and CENTERED.
-        - Realistic fabric wrinkles and lighting.
-        - SINGLE IMAGE output only. NO Collage.
+        ROLE: Professional Fashion Photographer.
+        TASK: Create a lifestyle mockup of a person wearing a ${typeText}.
+        
+        INSTRUCTIONS:
+        - IGNORE the original background. Create a blurred Urban Street or Cafe background.
+        - Apply the EXACT graphic design from the source image onto the chest of the new shirt.
+        - VIEW: Close-up portrait (Mid-thigh up). The shirt design must be the MAIN FOCUS.
+        - LIGHTING: Natural, soft sunlight.
+        - FORMAT: Single Image. Realism: 100%.
         `;
 
         // 2. FLAT LAY PROMPT (With Mandatory Props)
         const flatLayPrompt = `
-        ROLE: Product Photographer.
-        OBJECT: A folded ${typeText} placed on a wooden or marble table.
-        DESIGN: Apply the artwork from the source image onto the ${typeText}.
-        PROPS (MANDATORY): You MUST place these items around the shirt: ${props}.
-        COMPOSITION:
-        - Top-down view (Flat lay).
-        - Zoom in closely to show the design detail.
-        - Props should act as a frame but NOT cover the design.
-        - SINGLE IMAGE output only. NO Collage.
+        ROLE: Professional Product Photographer.
+        TASK: Create a creative Flat Lay composition of a folded ${typeText}.
+        
+        COMPOSITION RULES:
+        - BACKGROUND: Wooden table or White Marble texture (IGNORE original background).
+        - MANDATORY PROPS: Arrange these items around the shirt: ${props}.
+        - PLACEMENT: The shirt is in the CENTER. Props are on the edges.
+        - DESIGN: Apply the source graphic design clearly on the shirt.
+        - ZOOM: Zoom in tightly so the design detail is clearly visible.
+        - FORMAT: Single Image. Realism: 100%.
         `;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';

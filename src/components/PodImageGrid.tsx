@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { GeneratedImage } from '../podTypes';
 import JSZip from 'jszip';
@@ -72,7 +71,7 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         {images.map((image, index) => (
           <div key={index} className="bg-gray-800 rounded-xl overflow-hidden shadow-xl border border-gray-700 flex flex-col">
-            {/* Image Area - No Hover Effect */}
+            {/* Image Area */}
             <div 
                 className="relative aspect-square cursor-pointer bg-gray-900"
                 onClick={() => setPreviewImage(image)}
@@ -80,7 +79,7 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
                 <img src={image.src} alt={image.name} className="w-full h-full object-cover" />
             </div>
 
-            {/* Action Bar - ALWAYS VISIBLE */}
+            {/* Action Bar - ALWAYS VISIBLE (No Hover) */}
             <div className="p-3 bg-gray-900 border-t border-gray-700 flex gap-2">
                 <button 
                     onClick={() => setPreviewImage(image)}

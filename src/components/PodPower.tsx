@@ -45,7 +45,6 @@ const PodPower: React.FC = () => {
     setIsApiKeyModalOpen(true);
   }, []);
 
-  // Auto-refresh stats when switching features (assuming usage occurred)
   const handleSelectFeature = (feat: Feature) => {
       setSelectedFeature(feat);
       fetchStats();
@@ -61,7 +60,7 @@ const PodPower: React.FC = () => {
           />
       )}
 
-      {/* STATS SECTION (Moved to Top) */}
+      {/* STATS SECTION */}
       <div className="bg-gray-800 rounded-xl shadow-lg p-4 mb-8 border border-gray-700">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-white">📊 Team Usage Statistics</h3>
