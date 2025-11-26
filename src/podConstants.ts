@@ -22,21 +22,22 @@ export const VARIATION_COLORS: Color[] = [
 ];
 
 export const MOCKUP_PROPS: string[] = [
-  "a ceramic Mug",
-  "a plaid scarf",
-  "a soft Towel",
-  "a small Flower pot",
+  "a ceramic coffee Mug",
+  "a checkered plaid scarf",
+  "a folded soft Towel",
+  "a green Potted Plant",
   "a small Cactus",
-  "vintage Books",
-  "a Gold Pen",
-  "White Sneakers",
-  "a Bluetooth Speaker",
-  "a beige Bucket hat",
-  "a Baseball cap",
-  "Daisy flowers",
-  "a Red Rose",
-  "Eucalyptus branch",
-  "Blue Jeans",
-  "a Gold Necklace",
-  "a wooden Photo frame"
+  "open vintage Books",
+  "a luxury Pen",
+  "white canvas Sneakers",
+  "a Marshall Speaker",
+  "a beige bucket hat",
+  "a baseball cap",
+  "fresh Daisy flowers",
+  "a red Rose",
+  "dried Eucalyptus leaves",
+  "blue denim Jeans",
+  "gold chain Necklace",
+  "a wooden picture frame",
+  "sunglasses"
 ];

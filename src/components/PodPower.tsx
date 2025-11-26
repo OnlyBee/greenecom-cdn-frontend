@@ -24,10 +24,10 @@ const PodPower: React.FC = () => {
       setIsApiKeyModalOpen(true);
     }
     
-    // Fetch stats - Allow any user to see stats for debugging purposes now
+    // Fetch stats immediately
     api.getStats().then(data => {
-        if(data) setStats(data);
-    }).catch(err => console.warn("Stats fetch failed", err));
+        if(Array.isArray(data)) setStats(data);
+    }).catch(console.warn);
 
   }, [user]);
 
@@ -72,8 +72,8 @@ const PodPower: React.FC = () => {
         </div>
       </div>
 
-      {/* STATS SECTION - Visible to everyone for now */}
-      {stats.length > 0 && (
+      {/* STATS SECTION - Always render if there is data */}
+      {stats && stats.length > 0 && (
           <div className="mt-16 border-t border-gray-700 pt-8">
               <h3 className="text-2xl font-bold text-white mb-6 text-center">Usage Statistics</h3>
               <div className="bg-gray-800 rounded-xl shadow-2xl overflow-hidden max-w-4xl mx-auto border border-gray-700">

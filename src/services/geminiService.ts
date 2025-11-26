@@ -25,13 +25,11 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
 
     const ai = new GoogleGenAI({ apiKey });
     
-    // Call generateContent. Note: gemini-2.5-flash-image returns the image in the response structure.
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: { parts: [imagePart, { text: prompt }] },
     });
 
-    // Robustly find the image part
     const candidates = response.candidates;
     if (candidates && candidates.length > 0) {
         for (const part of candidates[0].content.parts) {
@@ -44,7 +42,6 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
 };
 
 const getRandomProps = (): string => {
-    // Randomly shuffle and pick 3 items
     const shuffled = [...MOCKUP_PROPS].sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, 3); 
     return selected.join(", "); 
@@ -56,18 +53,16 @@ export const generateVariations = async (file: File, selectedColors: Color[]): P
     const prompt = `
     ACT AS: Expert Product Retoucher.
     INPUT: An image of an apparel product with a design.
-    TASK: Recolor the fabric of the apparel to exactly '${color.name}'.
-    RULES:
-    1. KEEP the original design/artwork 100% unchanged.
-    2. KEEP the original lighting, wrinkles, and shadows realistic.
+    TASK: Change the fabric color of the apparel to '${color.name}'.
+    CRITICAL RULES:
+    1. PRESERVE the original design/artwork pixel-perfectly.
+    2. PRESERVE all original shadows, folds, and lighting.
     3. DO NOT change the background.
-    4. OUTPUT: High-quality realistic image.
     `;
     
     try {
         const src = await generateImage(imagePart, prompt);
-        // Track usage silently
-        api.recordUsage('variation').catch(e => console.warn("Stats error", e));
+        api.recordUsage('variation').catch(console.warn);
         return { src, name: `${color.name}_variation.png` };
     } catch (e) { 
         console.error(e);
@@ -81,49 +76,47 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
     const imagePart = await fileToGenerativePart(file);
     
     const createMockupPromises = (apparelType: ApparelType | null): Promise<GeneratedImage>[] => {
-        const typeText = apparelType ? apparelType : "t-shirt/sweatshirt";
+        const typeText = apparelType ? apparelType : "T-Shirt";
         
-        // --- LOGIC: MODEL PROMPT ---
+        // 1. MODEL MOCKUP
         const modelPrompt = `
         ACT AS: Fashion Photographer.
-        INPUT: Image of a shirt with a design.
-        TASK: Generate a LIFESTYLE MOCKUP of a real person wearing a ${typeText}.
+        TASK: Create a LIFESTYLE MODEL MOCKUP of a ${typeText}.
+        INPUT: Use the design/artwork from the source image.
         
-        CRITICAL INSTRUCTIONS:
-        1. EXTRACT the design from the source image and place it PERFECTLY on the new shirt.
-        2. ZOOM LEVEL: CLOSE-UP / PORTRAIT. The chest area and design must occupy 70% of the image.
-        3. MODEL: A diverse model, natural pose, looking at camera or smiling.
-        4. BACKGROUND: Blurred city street or cozy cafe. High depth of field.
-        5. LIGHTING: Golden hour or soft studio lighting.
+        INSTRUCTIONS:
+        - MODEL: Real person, casual pose, not looking at camera.
+        - ZOOM: **CLOSE-UP**. The design on the chest must be LARGE and CLEAR (occupy 50% of the frame).
+        - LIGHTING: Soft, natural golden hour light.
+        - BACKGROUND: Blurred urban street or coffee shop.
+        - QUALITY: Photorealistic, 4k, high detail.
         `;
 
-        // --- LOGIC: FLAT LAY PROMPT ---
+        // 2. FLAT LAY MOCKUP (With forced props)
         const props = getRandomProps();
         const flatLayPrompt = `
-        ACT AS: Professional Product Photographer.
-        INPUT: Image of a shirt with a design.
-        TASK: Generate a CREATIVE FLAT LAY of a folded ${typeText}.
+        ACT AS: Creative Director.
+        TASK: Create a STYLIZED FLAT LAY MOCKUP of a folded ${typeText}.
+        INPUT: Use the design/artwork from the source image.
         
-        MANDATORY SCENE COMPOSITION:
-        1. BACKGROUND: Use a textured WOODEN or MARBLE surface. DO NOT use a plain white background.
-        2. DECORATION: You MUST place these exact items around the shirt: ${props}.
-        3. ARRANGEMENT: Place the props artistically in the corners or sides. Do NOT cover the design.
-        4. ZOOM: CLOSE-UP. The shirt design must be clearly visible and sharp.
-        5. LIGHTING: Bright, natural window light with soft shadows.
-        
-        The result must look like a high-end Etsy product listing.
+        COMPOSITION RULES (MANDATORY):
+        - BACKGROUND: Use a textured wood or white marble surface.
+        - PROPS: You MUST place these items around the shirt: ${props}.
+        - ARRANGEMENT: The shirt is in the center. Props are arranged artistically around it.
+        - ZOOM: **EXTREME CLOSE-UP**. Focus on the chest area so the design is very readable.
+        - STYLE: Cozy, warm, "Instagram aesthetic".
         `;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
         
         const modelPromise = generateImage(imagePart, modelPrompt).then(src => {
-            api.recordUsage('mockup').catch(e => console.warn(e));
+            api.recordUsage('mockup').catch(console.warn);
             return { src, name: `model${nameSuffix}_mockup.png` };
         });
         
         const flatLayPromise = generateImage(imagePart, flatLayPrompt).then(src => {
-            api.recordUsage('mockup').catch(e => console.warn(e));
-            return { src, name: `flatlay${nameSuffix}_mockup.png` };
+            api.recordUsage('mockup').catch(console.warn);
+            return { src, name: `flatlay${nameSuffix}_with_props.png` };
         });
 
         return [modelPromise, flatLayPromise];
