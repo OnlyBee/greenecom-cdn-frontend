@@ -6,7 +6,7 @@ const getToken = () => localStorage.getItem('greenecom_token');
 
 const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
   const headers: HeadersInit = {
-    ...options.headers,
+    any
   };
   const token = getToken();
   if (token && !(options.body instanceof FormData)) {
