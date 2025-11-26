@@ -24,10 +24,11 @@ const PodPower: React.FC = () => {
       setIsApiKeyModalOpen(true);
     }
     
-    // Fetch stats if admin
-    if (user?.role === 'ADMIN') {
-        api.getStats().then(setStats).catch(err => console.log("Stats fetch ignored"));
-    }
+    // Fetch stats - Allow any user to see stats for debugging purposes now
+    api.getStats().then(data => {
+        if(data) setStats(data);
+    }).catch(err => console.warn("Stats fetch failed", err));
+
   }, [user]);
 
   const handleSaveApiKey = (key: string) => {
@@ -71,21 +72,21 @@ const PodPower: React.FC = () => {
         </div>
       </div>
 
-      {/* STATS SECTION (ADMIN ONLY) */}
-      {user?.role === 'ADMIN' && stats.length > 0 && (
+      {/* STATS SECTION - Visible to everyone for now */}
+      {stats.length > 0 && (
           <div className="mt-16 border-t border-gray-700 pt-8">
-              <h3 className="text-2xl font-bold text-white mb-6 text-center">System Usage Statistics</h3>
-              <div className="bg-gray-800 rounded-xl shadow-2xl overflow-hidden max-w-4xl mx-auto">
+              <h3 className="text-2xl font-bold text-white mb-6 text-center">Usage Statistics</h3>
+              <div className="bg-gray-800 rounded-xl shadow-2xl overflow-hidden max-w-4xl mx-auto border border-gray-700">
                   <table className="w-full text-left">
                       <thead className="bg-gray-700 text-gray-300 uppercase text-sm">
                           <tr>
                               <th className="px-6 py-4">User</th>
-                              <th className="px-6 py-4">Variation Calls</th>
-                              <th className="px-6 py-4">Mockup Calls</th>
-                              <th className="px-6 py-4 text-right">Total Usage</th>
+                              <th className="px-6 py-4">Variation</th>
+                              <th className="px-6 py-4">Mockup</th>
+                              <th className="px-6 py-4 text-right">Total</th>
                           </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-700">
+                      <tbody className="divide-y divide-gray-700 text-sm">
                           {stats.map((stat, idx) => (
                               <tr key={idx} className="hover:bg-gray-700/50 transition-colors">
                                   <td className="px-6 py-4 font-medium text-white">{stat.username}</td>

@@ -28,6 +28,7 @@ const pool = new Pool({
 // --- DB INIT ---
 const initDb = async () => {
     try {
+        // Ensure stats table exists
         await pool.query(`
             CREATE TABLE IF NOT EXISTS usage_stats (
                 id SERIAL PRIMARY KEY,
@@ -36,7 +37,7 @@ const initDb = async () => {
                 used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        console.log("Stats table initialized");
+        console.log("Database initialized");
     } catch (err) { console.error("DB Init Error", err); }
 };
 initDb();
@@ -240,7 +241,7 @@ app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, re
   } catch (e) { await client.query('ROLLBACK'); res.status(500).json({ error: e.message }); } finally { client.release(); }
 });
 
-// --- STATS TRACKING ---
+// --- STATS TRACKING ENDPOINTS ---
 app.post(['/stats/record', '/api/stats/record'], authenticateToken, async (req, res) => {
   try {
     await pool.query('INSERT INTO usage_stats (user_id, feature) VALUES ($1, $2)', [req.user.id, req.body.feature]);
@@ -248,9 +249,19 @@ app.post(['/stats/record', '/api/stats/record'], authenticateToken, async (req, 
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get(['/stats', '/api/stats'], authenticateToken, isAdmin, async (req, res) => {
+app.get(['/stats', '/api/stats'], authenticateToken, async (req, res) => {
+    // Allow all users to fetch stats for now to verify visibility
     try {
-        const result = await pool.query(`SELECT u.username, COUNT(CASE WHEN s.feature = 'variation' THEN 1 END) as variation_count, COUNT(CASE WHEN s.feature = 'mockup' THEN 1 END) as mockup_count, COUNT(s.id) as total_count FROM users u LEFT JOIN usage_stats s ON u.id = s.user_id GROUP BY u.id, u.username ORDER BY total_count DESC`);
+        const result = await pool.query(`
+            SELECT u.username, 
+            COUNT(CASE WHEN s.feature = 'variation' THEN 1 END) as variation_count, 
+            COUNT(CASE WHEN s.feature = 'mockup' THEN 1 END) as mockup_count, 
+            COUNT(s.id) as total_count 
+            FROM users u 
+            LEFT JOIN usage_stats s ON u.id = s.user_id 
+            GROUP BY u.id, u.username 
+            ORDER BY total_count DESC
+        `);
         res.json(result.rows);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
