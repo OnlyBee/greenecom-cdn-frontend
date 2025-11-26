@@ -42,7 +42,9 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
 
 const getRandomProps = (): string => {
     const shuffled = [...MOCKUP_PROPS].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, 3).join(", "); 
+    // Select 2 to 3 items
+    const count = Math.floor(Math.random() * 2) + 2; 
+    return shuffled.slice(0, count).join(", "); 
 };
 
 export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
@@ -54,9 +56,8 @@ export const generateVariations = async (file: File, selectedColors: Color[]): P
     
     try {
         const src = await generateImage(imagePart, prompt);
-        // Track usage silently
         api.recordUsage('variation').catch(e => console.error("Tracking error:", e));
-        return { src, name: `${color.name}.png` };
+        return { src, name: `${color.name}_variation.png` };
     } catch (e) { throw e; }
   });
   return Promise.all(promises);
@@ -66,24 +67,30 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
     const imagePart = await fileToGenerativePart(file);
     
     const createMockupPromises = (apparelType: ApparelType | null): Promise<GeneratedImage>[] => {
-        const basePrompt = `Analyze the provided image. Identify the graphic design/artwork on the chest. You MUST preserve this design exactly in the new image.`;
+        const basePrompt = `You are an expert product photographer. Analyze the provided image to extract the graphic design/artwork on the chest. You MUST preserve this design EXACTLY in the new image.`;
         const typeText = apparelType ? apparelType : "apparel";
 
-        // MODEL PROMPT (Close-up focus)
+        // MODEL PROMPT
         const modelPrompt = `${basePrompt}
-        TASK: Generate a photorealistic mockup of a model wearing a ${typeText}.
-        ZOOM: EXTREME CLOSE-UP on the torso/chest area. The design must be LARGE, CLEAR, and CENTERED. Do not show legs.
-        STYLE: Professional, clean, studio lighting. Neutral background.`;
+        TASK: Generate a high-end lifestyle mockup of a model wearing a ${typeText}.
+        MODEL: The model should look natural and professional.
+        BACKGROUND: Use a blurred urban street or a cozy coffee shop background.
+        ZOOM: EXTREME CLOSE-UP on the upper body. The shirt and design must fill 80% of the frame. The design must be sharp and legible.
+        LIGHTING: Soft, natural sunlight.`;
 
-        // FLAT LAY PROMPT (Random Props + Close-up)
+        // FLAT LAY PROMPT - Stronger instruction for Props
         const randomProps = getRandomProps();
         const flatLayPrompt = `${basePrompt}
-        TASK: Generate a photorealistic flat-lay mockup of a ${typeText} placed on a wooden or marble surface.
+        TASK: Generate a creative Flat Lay composition of a ${typeText} on a wooden or marble texture surface.
         
-        CRITICAL REQUIREMENT - PROPS: You MUST place these items randomly around the ${typeText} to create a cozy composition: ${randomProps}.
-        The props must be visible but must NOT cover the design on the shirt.
+        *** MANDATORY DECORATION INSTRUCTIONS ***
+        You MUST place the following items around the shirt to create a scene: ${randomProps}.
+        - The props must be clearly visible.
+        - Arrange them artistically (e.g., shoes in corner, plant on side).
+        - Do NOT cover the design on the shirt.
         
-        ZOOM: CLOSE-UP view. Frame the image tightly around the folded ${typeText}. The design must be the main focus.`;
+        VIEW: Top-down view.
+        ZOOM: ZOOM IN tightly on the folded shirt so the design is the star of the image.`;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
         
