@@ -28,7 +28,6 @@ export const VARIATION_COLORS: Color[] = [
   { name: "Heliconia", value: "HELICONIA", hex: "#DB0F66" },
   { name: "Indigo Blue", value: "INDIGO BLUE", hex: "#00416A" },
   { name: "Kiwi", value: "KIWI", hex: "#8EE53F" },
-  { name: "Orange", value: "ORANGE", hex: "#FFA500" },
   { name: "Safety Green", value: "SAFETY GREEN", hex: "#CCFF00" },
   { name: "Safety Orange", value: "SAFETY ORANGE", hex: "#FF6700" },
   { name: "Safety Pink", value: "SAFETY PINK", hex: "#FF69B4" },

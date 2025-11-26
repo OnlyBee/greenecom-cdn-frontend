@@ -6,7 +6,7 @@ const API_BASE_URL = '/api';
 const getToken = () => localStorage.getItem('greenecom_token');
 
 const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
-  // Fix TypeScript error by casting to any to allow dynamic header assignment
+  // Cast headers to 'any' to avoid TypeScript error with HeadersInit
   const headers: any = {
     ...options.headers,
   };
