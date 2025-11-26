@@ -21,21 +21,21 @@ export const VARIATION_COLORS: Color[] = [
 ];
 
 export const MOCKUP_PROPS: string[] = [
-  "a ceramic Mug", // Mug
-  "a random colored plaid scarf", // khăn caro màu ngẫu nhiên
-  "a plain soft towel", // khăn thường
-  "a flower pot", // chậu hoa
-  "a small cactus pot", // chậu hoa xương rông nhỏ
-  "vintage books", // sách
-  "a pen", // bút
-  "sneakers", // giày sneaker
-  "a bluetooth speaker", // loa
-  "a wide-brim hat", // mũ vành
-  "a baseball cap", // mũ lưỡi trai
-  "daisy flowers", // bông cúc
-  "roses", // hoa hồng
-  "a tree branch", // nhành cây
-  "blue jeans", // quần jean
-  "a necklace", // dây chuyền
-  "a photo frame" // khung ảnh
+  "a ceramic Mug", 
+  "a plaid scarf", 
+  "a soft towel", 
+  "a flower pot", 
+  "a small cactus", 
+  "vintage books", 
+  "a pen", 
+  "sneakers", 
+  "a bluetooth speaker", 
+  "a wide-brim hat", 
+  "a baseball cap", 
+  "daisy flowers", 
+  "red roses", 
+  "a tree branch", 
+  "blue jeans", 
+  "a gold necklace", 
+  "a photo frame"
 ];

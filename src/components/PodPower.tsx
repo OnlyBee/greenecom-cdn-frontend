@@ -45,6 +45,12 @@ const PodPower: React.FC = () => {
     setIsApiKeyModalOpen(true);
   }, []);
 
+  // Auto-refresh stats when switching features (assuming usage occurred)
+  const handleSelectFeature = (feat: Feature) => {
+      setSelectedFeature(feat);
+      fetchStats();
+  };
+
   return (
     <div className="min-h-screen text-gray-100 font-sans relative pb-20">
       {(!apiKey || isApiKeyModalOpen) && (
@@ -54,6 +60,44 @@ const PodPower: React.FC = () => {
             onSave={handleSaveApiKey}
           />
       )}
+
+      {/* STATS SECTION (Moved to Top) */}
+      <div className="bg-gray-800 rounded-xl shadow-lg p-4 mb-8 border border-gray-700">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-white">📊 Team Usage Statistics</h3>
+            <button 
+                onClick={fetchStats} 
+                disabled={loadingStats}
+                className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-gray-300 transition"
+            >
+                {loadingStats ? '...' : 'Refresh'}
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-900 text-gray-400 uppercase text-xs">
+                      <tr>
+                          <th className="px-4 py-2">User</th>
+                          <th className="px-4 py-2">Variation</th>
+                          <th className="px-4 py-2">Mockup</th>
+                          <th className="px-4 py-2 text-right">Total</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700">
+                      {stats.length > 0 ? stats.map((stat, idx) => (
+                          <tr key={idx} className="hover:bg-gray-700/50">
+                              <td className="px-4 py-2 font-medium text-white">{stat.username}</td>
+                              <td className="px-4 py-2 text-green-400">{stat.variation_count || 0}</td>
+                              <td className="px-4 py-2 text-purple-400">{stat.mockup_count || 0}</td>
+                              <td className="px-4 py-2 text-right font-bold">{stat.total_count}</td>
+                          </tr>
+                      )) : (
+                          <tr><td colSpan={4} className="px-4 py-2 text-center text-gray-500">No data yet.</td></tr>
+                      )}
+                  </tbody>
+              </table>
+          </div>
+      </div>
 
       <div className="pb-8">
         <div className="text-center mb-8">
@@ -65,56 +109,13 @@ const PodPower: React.FC = () => {
 
         <PodFeatureSelector
           selectedFeature={selectedFeature}
-          onSelectFeature={setSelectedFeature}
+          onSelectFeature={handleSelectFeature}
         />
         
         <div className="mt-8">
           {selectedFeature === 'variation' && <PodVariationGenerator onApiError={handleApiError} />}
           {selectedFeature === 'mockup' && <PodMockupRemaker onApiError={handleApiError} />}
         </div>
-      </div>
-
-      {/* STATS SECTION */}
-      <div className="mt-16 border-t border-gray-700 pt-8">
-          <div className="flex justify-between items-center mb-6 max-w-4xl mx-auto px-4">
-            <h3 className="text-2xl font-bold text-white">Usage Statistics</h3>
-            <button 
-                onClick={fetchStats} 
-                disabled={loadingStats}
-                className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-gray-300 transition"
-            >
-                {loadingStats ? 'Refreshing...' : '↻ Refresh Stats'}
-            </button>
-          </div>
-          
-          <div className="bg-gray-800 rounded-xl shadow-2xl overflow-hidden max-w-4xl mx-auto border border-gray-700">
-              <table className="w-full text-left">
-                  <thead className="bg-gray-700 text-gray-300 uppercase text-sm">
-                      <tr>
-                          <th className="px-6 py-4">User</th>
-                          <th className="px-6 py-4">Variation</th>
-                          <th className="px-6 py-4">Mockup</th>
-                          <th className="px-6 py-4 text-right">Total</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-700 text-sm">
-                      {stats.length > 0 ? stats.map((stat, idx) => (
-                          <tr key={idx} className="hover:bg-gray-700/50 transition-colors">
-                              <td className="px-6 py-4 font-medium text-white">{stat.username}</td>
-                              <td className="px-6 py-4 text-green-400 font-mono">{stat.variation_count || 0}</td>
-                              <td className="px-6 py-4 text-purple-400 font-mono">{stat.mockup_count || 0}</td>
-                              <td className="px-6 py-4 text-right font-bold text-white text-lg">{stat.total_count}</td>
-                          </tr>
-                      )) : (
-                          <tr>
-                              <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                                  No usage recorded yet. Generate some images!
-                              </td>
-                          </tr>
-                      )}
-                  </tbody>
-              </table>
-          </div>
       </div>
     </div>
   );

@@ -49,17 +49,18 @@ const getRandomProps = (): string => {
 export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
   const imagePart = await fileToGenerativePart(file);
   const promises = selectedColors.map(async (color) => {
-    // Specific Prompt for Color Change
     const prompt = `
-    TASK: Change the color of the shirt/apparel in this image to ${color.name}.
-    CONSTRAINT: Keep the design/artwork on the shirt EXACTLY the same. 
-    CONSTRAINT: Keep the background and shadows EXACTLY the same.
-    OUTPUT: Photorealistic image.
+    ACT AS: Professional Product Retoucher.
+    TASK: Recolor the apparel in this image to ${color.name}.
+    RULES:
+    1. KEEP the original design/artwork 100% intact.
+    2. KEEP the background, shadows, and lighting exactly the same.
+    3. ONLY change the fabric color of the shirt/hoodie.
+    OUTPUT: High-quality photorealistic image.
     `;
     
     try {
         const src = await generateImage(imagePart, prompt);
-        // Track usage
         api.recordUsage('variation').catch(console.warn);
         return { src, name: `${color.name}_variation.png` };
     } catch (e) { 
@@ -77,24 +78,28 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         const typeText = apparelType ? apparelType : "T-Shirt";
         const props = getRandomProps();
         
-        // 1. MODEL PROMPT (Aggressive Close-up)
+        // 1. MODEL PROMPT
         const modelPrompt = `
-        Create a LIFESTYLE MODEL MOCKUP.
-        - Product: ${typeText} with the exact artwork from the source image.
-        - Model: A realistic person wearing the product.
-        - Zoom: EXTREME CLOSE-UP on the chest/torso area. The design must be the main focus.
-        - Background: Soft blur, outdoors or coffee shop.
-        - Lighting: Cinematic, high quality.
+        ACT AS: Fashion Photographer.
+        TASK: Create a Lifestyle Model Mockup for this ${typeText}.
+        INPUT: Use the graphic design/artwork from the source image.
+        SCENE:
+        - Model: A realistic person wearing the ${typeText}.
+        - Pose: Natural, standing or sitting.
+        - Background: Blurred urban street or cozy cafe.
+        - ZOOM: CLOSE-UP on the chest area. The artwork must be HUGE and CLEAR.
         `;
 
-        // 2. FLAT LAY PROMPT (Aggressive Props & Composition)
+        // 2. FLAT LAY PROMPT (With Props)
         const flatLayPrompt = `
-        Create a STYLIZED FLAT LAY MOCKUP.
-        - Product: Folded ${typeText} with the exact artwork from the source image.
-        - Surface: Textured wood or marble table.
+        ACT AS: Professional Product Photographer.
+        TASK: Create a Stylized Flat Lay Mockup for this ${typeText}.
+        INPUT: Use the graphic design/artwork from the source image.
+        COMPOSITION:
+        - Surface: Rustic wooden table or white marble.
+        - Center: The ${typeText} folded neatly.
         - DECORATION (MANDATORY): You MUST place these items around the shirt: ${props}.
-        - Composition: Product in center, items scattered naturally around.
-        - Zoom: TOP-DOWN CLOSE-UP. The design must be clearly visible.
+        - ZOOM: TOP-DOWN CLOSE-UP. Fill the frame with the shirt and props.
         `;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
@@ -106,7 +111,7 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         
         const flatLayPromise = generateImage(imagePart, flatLayPrompt).then(src => {
             api.recordUsage('mockup').catch(console.warn);
-            return { src, name: `flatlay${nameSuffix}_with_props.png` };
+            return { src, name: `flatlay${nameSuffix}_props.png` };
         });
 
         return [modelPromise, flatLayPromise];
