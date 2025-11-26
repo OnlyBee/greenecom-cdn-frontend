@@ -1,130 +1,127 @@
 
-import { GoogleGenAI } from "@google/genai";
-import type { GeneratedImage, Color, ApparelType } from "../podTypes";
-import { getApiKey } from '../utils/apiKey';
-import { MOCKUP_PROPS } from '../podConstants';
-import { api } from './api';
+import React, { useState } from 'react';
+import type { GeneratedImage } from '../podTypes';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
-const fileToGenerativePart = async (file: File) => {
-  const base64EncodedDataPromise = new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-    reader.readAsDataURL(file);
-  });
-  return {
-    inlineData: {
-      data: await base64EncodedDataPromise,
-      mimeType: file.type,
-    },
-  };
-};
+interface ImageGridProps {
+  images: GeneratedImage[];
+}
 
-const generateImage = async (imagePart: any, prompt: string): Promise<string> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API key not found.");
+const EyeIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+        <circle cx="12" cy="12" r="3"/>
+    </svg>
+);
 
-    const ai = new GoogleGenAI({ apiKey });
-    
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: { parts: [imagePart, { text: prompt }] },
-    });
+const DownloadIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+);
 
-    // Safe check for response structure
-    const candidates = response.candidates;
-    if (candidates && candidates.length > 0 && candidates[0].content?.parts) {
-        for (const part of candidates[0].content.parts) {
-            if (part.inlineData) {
-                return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            }
-        }
-    }
-    throw new Error("AI generated text instead of image. Please try again.");
-};
+const CloseIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+);
 
-const getRandomProps = (): string => {
-    const shuffled = [...MOCKUP_PROPS].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, 3); 
-    return selected.join(", "); 
-};
+export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
+  const [previewImage, setPreviewImage] = useState<GeneratedImage | null>(null);
+  const [isZipping, setIsZipping] = useState(false);
 
-export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
-  const imagePart = await fileToGenerativePart(file);
-  const promises = selectedColors.map(async (color) => {
-    const prompt = `
-    TASK: Recolor the apparel to ${color.name}.
-    STRICT RULES:
-    1. Keep the original graphic design 100% identical.
-    2. Keep the background and lighting 100% identical.
-    3. Output a SINGLE, high-quality image.
-    4. DO NOT create a collage or split screen.
-    `;
-    
+  if (!images || images.length === 0) return null;
+
+  const handleDownloadAll = async () => {
+    setIsZipping(true);
+    const zip = new JSZip();
     try {
-        const src = await generateImage(imagePart, prompt);
-        api.recordUsage('variation').catch(console.warn);
-        return { src, name: `${color.name}_variation.png` };
-    } catch (e) { 
-        console.error(e);
-        throw e; 
-    }
-  });
-  return Promise.all(promises);
-};
-
-export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Promise<GeneratedImage[]> => {
-    const imagePart = await fileToGenerativePart(file);
-    
-    const createMockupPromises = (apparelType: ApparelType | null): Promise<GeneratedImage>[] => {
-        const typeText = apparelType ? apparelType : "T-Shirt";
-        const props = getRandomProps();
-        
-        // 1. MODEL PROMPT (Lifestyle)
-        const modelPrompt = `
-        ROLE: Fashion Photographer.
-        OBJECT: A realistic model wearing a ${typeText}.
-        DESIGN: Apply the artwork from the source image onto the chest of the ${typeText}.
-        SCENE: Urban street or cozy cafe background (Blurred).
-        CAMERA: Portrait shot, Close-up on the torso.
-        REQUIREMENT:
-        - The artwork must be LARGE, CLEAR, and CENTERED.
-        - Realistic fabric wrinkles and lighting.
-        - SINGLE IMAGE output only. NO Collage.
-        `;
-
-        // 2. FLAT LAY PROMPT (With Mandatory Props)
-        const flatLayPrompt = `
-        ROLE: Product Photographer.
-        OBJECT: A folded ${typeText} placed on a wooden or marble table.
-        DESIGN: Apply the artwork from the source image onto the ${typeText}.
-        PROPS (MANDATORY): You MUST place these items around the shirt: ${props}.
-        COMPOSITION:
-        - Top-down view (Flat lay).
-        - Zoom in closely to show the design detail.
-        - Props should act as a frame but NOT cover the design.
-        - SINGLE IMAGE output only. NO Collage.
-        `;
-        
-        const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
-        
-        const modelPromise = generateImage(imagePart, modelPrompt).then(src => {
-            api.recordUsage('mockup').catch(console.warn);
-            return { src, name: `model${nameSuffix}_mockup.png` };
+        const promises = images.map(async (img) => {
+            const res = await fetch(img.src);
+            const blob = await res.blob();
+            zip.file(img.name, blob);
         });
-        
-        const flatLayPromise = generateImage(imagePart, flatLayPrompt).then(src => {
-            api.recordUsage('mockup').catch(console.warn);
-            return { src, name: `flatlay${nameSuffix}_props.png` };
-        });
-
-        return [modelPromise, flatLayPromise];
-    };
-
-    let allPromises: Promise<GeneratedImage>[] = [];
-    if (apparelTypes.length === 0) {
-        allPromises = createMockupPromises(null);
-    } else {
-        apparelTypes.forEach(type => allPromises.push(...createMockupPromises(type)));
+        await Promise.all(promises);
+        const content = await zip.generateAsync({ type: "blob" });
+        saveAs(content, "pod_results.zip");
+    } catch (e) {
+        alert("Failed to zip files.");
+    } finally {
+        setIsZipping(false);
     }
-    return Promise.all(allPromises);
+  };
+
+  return (
+    <div className="mt-12 pt-8 w-full border-t border-gray-700">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+          <h2 className="text-2xl font-bold text-white">Results ({images.length})</h2>
+          <button 
+            onClick={handleDownloadAll} 
+            disabled={isZipping}
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-all transform hover:scale-105"
+          >
+            <DownloadIcon />
+            {isZipping ? 'Compressing...' : 'DOWNLOAD ALL (.ZIP)'}
+          </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+        {images.map((image, index) => (
+          <div key={index} className="bg-gray-800 rounded-xl overflow-hidden shadow-xl border border-gray-700 flex flex-col">
+            {/* Image Area - No Hover Effect */}
+            <div 
+                className="relative aspect-square cursor-pointer bg-gray-900"
+                onClick={() => setPreviewImage(image)}
+            >
+                <img src={image.src} alt={image.name} className="w-full h-full object-cover" />
+            </div>
+
+            {/* Action Bar - ALWAYS VISIBLE */}
+            <div className="p-3 bg-gray-900 border-t border-gray-700 flex gap-2">
+                <button 
+                    onClick={() => setPreviewImage(image)}
+                    className="flex-1 bg-gray-700 hover:bg-blue-600 text-white py-2.5 rounded-md text-sm font-bold flex justify-center items-center gap-2 transition-colors"
+                    title="Preview"
+                >
+                    <EyeIcon /> View
+                </button>
+                <a 
+                    href={image.src} 
+                    download={image.name} 
+                    className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-md text-sm font-bold flex justify-center items-center gap-2 transition-colors"
+                    title="Download"
+                >
+                    <DownloadIcon /> Save
+                </a>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Full Screen Preview Modal */}
+      {previewImage && (
+        <div 
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-4"
+            onClick={() => setPreviewImage(null)}
+        >
+            <button 
+                onClick={() => setPreviewImage(null)} 
+                className="absolute top-6 right-6 text-gray-400 hover:text-white bg-gray-800 p-3 rounded-full border border-gray-600 z-50"
+            >
+                <CloseIcon />
+            </button>
+            <img 
+                src={previewImage.src} 
+                alt={previewImage.name} 
+                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl border border-gray-800" 
+                onClick={e => e.stopPropagation()}
+            />
+        </div>
+      )}
+    </div>
+  );
 };
