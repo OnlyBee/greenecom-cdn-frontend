@@ -46,9 +46,10 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
         });
         await Promise.all(promises);
         const content = await zip.generateAsync({ type: "blob" });
-        saveAs(content, "pod_results.zip");
+        saveAs(content, "greenecom_pod_results.zip");
     } catch (e) {
-        alert("Failed to zip files.");
+        console.error("Zipping failed:", e);
+        alert("Failed to create zip file. Check console for details.");
     } finally {
         setIsZipping(false);
     }
@@ -57,51 +58,46 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
   return (
     <div className="mt-12 pt-8 w-full border-t border-gray-700">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-          <h2 className="text-2xl font-bold text-white">Results ({images.length})</h2>
+          <h2 className="text-2xl font-bold text-white">Generated Images ({images.length})</h2>
           <button 
             onClick={handleDownloadAll} 
             disabled={isZipping}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-all transform hover:scale-105"
+            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-all transform hover:scale-105"
           >
             <DownloadIcon />
-            {isZipping ? 'Compressing...' : 'DOWNLOAD ALL (.ZIP)'}
+            {isZipping ? 'Zipping...' : 'Download All (.zip)'}
           </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {images.map((image, index) => (
           <div key={index} className="bg-gray-800 rounded-xl overflow-hidden shadow-xl border border-gray-700 flex flex-col">
-            {/* Image Area */}
-            <div 
-                className="relative aspect-square cursor-pointer bg-gray-900"
-                onClick={() => setPreviewImage(image)}
-            >
+            <div className="relative aspect-square bg-gray-900 group">
                 <img src={image.src} alt={image.name} className="w-full h-full object-cover" />
-            </div>
-
-            {/* Action Bar - ALWAYS VISIBLE (No Hover) */}
-            <div className="p-3 bg-gray-900 border-t border-gray-700 flex gap-2">
-                <button 
+                <div 
+                    className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => setPreviewImage(image)}
-                    className="flex-1 bg-gray-700 hover:bg-blue-600 text-white py-2.5 rounded-md text-sm font-bold flex justify-center items-center gap-2 transition-colors"
-                    title="Preview"
                 >
-                    <EyeIcon /> View
-                </button>
+                    <div className="text-white flex items-center gap-2 border-2 border-white rounded-full px-4 py-2">
+                        <EyeIcon />
+                        <span className="font-bold">Preview</span>
+                    </div>
+                </div>
+            </div>
+            <div className="p-3 bg-gray-900 border-t border-gray-700">
                 <a 
                     href={image.src} 
                     download={image.name} 
-                    className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-md text-sm font-bold flex justify-center items-center gap-2 transition-colors"
-                    title="Download"
+                    className="w-full bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-md text-sm font-bold flex justify-center items-center gap-2 transition-colors"
+                    title="Download this image"
                 >
-                    <DownloadIcon /> Save
+                    <DownloadIcon /> Download
                 </a>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Full Screen Preview Modal */}
       {previewImage && (
         <div 
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-4"

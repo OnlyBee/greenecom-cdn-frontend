@@ -9,94 +9,110 @@ import { api } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
 const PodPower: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   const [selectedFeature, setSelectedFeature] = useState<Feature>('variation');
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [apiKey, setApiKeyState] = useState<string | null>(null);
   const [stats, setStats] = useState<any[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
-  const { user } = useAuth();
 
   const fetchStats = useCallback(() => {
-      setLoadingStats(true);
-      api.getStats().then(data => {
-          if(Array.isArray(data)) setStats(data);
-      }).catch(console.warn).finally(() => setLoadingStats(false));
-  }, []);
+    if (!isAdmin) return; // Chỉ Admin mới lấy stats
+    setLoadingStats(true);
+    api.getStats()
+      .then(data => { if (Array.isArray(data)) setStats(data); })
+      .catch(console.warn)
+      .finally(() => setLoadingStats(false));
+  }, [isAdmin]);
 
   useEffect(() => {
     const existingKey = getApiKey();
     if (existingKey) {
       setApiKeyState(existingKey);
     } else {
-      setIsApiKeyModalOpen(true);
+      // Nếu không có key, chỉ admin mới bị bắt nhập
+      if (isAdmin) {
+        setIsApiKeyModalOpen(true);
+      }
     }
     fetchStats();
-  }, [user, fetchStats]);
+  }, [isAdmin, fetchStats]);
 
   const handleSaveApiKey = (key: string) => {
     saveApiKey(key);
     setApiKeyState(key);
     setIsApiKeyModalOpen(false);
   };
-
+  
+  // Khi API báo lỗi key, chỉ admin mới thấy modal nhập lại
   const handleApiError = useCallback(() => {
-    clearApiKey();
-    setApiKeyState(null);
-    setIsApiKeyModalOpen(true);
-  }, []);
+    if (isAdmin) {
+        clearApiKey();
+        setApiKeyState(null);
+        setIsApiKeyModalOpen(true);
+    }
+  }, [isAdmin]);
 
   const handleSelectFeature = (feat: Feature) => {
       setSelectedFeature(feat);
+      // Tải lại stats mỗi khi chuyển tab
       fetchStats();
   };
 
+  const shouldShowApiKeyModal = isApiKeyModalOpen && isAdmin;
+
   return (
     <div className="min-h-screen text-gray-100 font-sans relative pb-20">
-      {(!apiKey || isApiKeyModalOpen) && (
+      {shouldShowApiKeyModal && (
           <PodApiKeyModal
+            isAdmin={isAdmin}
             isOpen={true}
             onClose={() => { if (apiKey) setIsApiKeyModalOpen(false); }}
             onSave={handleSaveApiKey}
           />
       )}
 
-      {/* STATS SECTION */}
-      <div className="bg-gray-800 rounded-xl shadow-lg p-4 mb-8 border border-gray-700">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-white">📊 Team Usage Statistics</h3>
-            <button 
-                onClick={fetchStats} 
-                disabled={loadingStats}
-                className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-gray-300 transition"
-            >
-                {loadingStats ? '...' : 'Refresh'}
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                  <thead className="bg-gray-900 text-gray-400 uppercase text-xs">
-                      <tr>
-                          <th className="px-4 py-2">User</th>
-                          <th className="px-4 py-2">Variation</th>
-                          <th className="px-4 py-2">Mockup</th>
-                          <th className="px-4 py-2 text-right">Total</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-700">
-                      {stats.length > 0 ? stats.map((stat, idx) => (
-                          <tr key={idx} className="hover:bg-gray-700/50">
-                              <td className="px-4 py-2 font-medium text-white">{stat.username}</td>
-                              <td className="px-4 py-2 text-green-400">{stat.variation_count || 0}</td>
-                              <td className="px-4 py-2 text-purple-400">{stat.mockup_count || 0}</td>
-                              <td className="px-4 py-2 text-right font-bold">{stat.total_count}</td>
-                          </tr>
-                      )) : (
-                          <tr><td colSpan={4} className="px-4 py-2 text-center text-gray-500">No data yet.</td></tr>
-                      )}
-                  </tbody>
-              </table>
-          </div>
-      </div>
+      {/* STATS SECTION (chỉ Admin thấy) */}
+      {isAdmin && (
+        <div className="bg-gray-800 rounded-xl shadow-lg p-4 mb-8 border border-gray-700">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-white">📊 Team Usage Statistics</h3>
+                <button 
+                    onClick={fetchStats} 
+                    disabled={loadingStats}
+                    className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-gray-300 transition"
+                >
+                    {loadingStats ? 'Loading...' : 'Refresh'}
+                </button>
+            </div>
+            <div className="overflow-x-auto max-h-60">
+                <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-900 text-gray-400 uppercase text-xs sticky top-0">
+                        <tr>
+                            <th className="px-4 py-2">User</th>
+                            <th className="px-4 py-2">Variations</th>
+                            <th className="px-4 py-2">Mockups</th>
+                            <th className="px-4 py-2 text-right font-semibold">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-700">
+                        {stats.length > 0 ? stats.map((stat, idx) => (
+                            <tr key={idx} className="hover:bg-gray-700/50">
+                                <td className="px-4 py-2 font-medium text-white">{stat.username}</td>
+                                <td className="px-4 py-2 text-green-400 font-mono">{stat.variation_count || 0}</td>
+                                <td className="px-4 py-2 text-purple-400 font-mono">{stat.mockup_count || 0}</td>
+                                <td className="px-4 py-2 text-right font-bold text-white font-mono">{stat.total_count}</td>
+                            </tr>
+                        )) : (
+                            <tr><td colSpan={4} className="px-4 py-4 text-center text-gray-500">No usage data recorded yet.</td></tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      )}
 
       <div className="pb-8">
         <div className="text-center mb-8">

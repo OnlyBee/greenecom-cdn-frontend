@@ -20,22 +20,23 @@ export const VARIATION_COLORS: Color[] = [
   { name: "Orange", value: "ORANGE", hex: "#FFA500" }
 ];
 
+// Dịch sang tiếng Anh để AI hiểu tốt hơn
 export const MOCKUP_PROPS: string[] = [
-  "a ceramic Mug", 
+  "a ceramic mug", 
   "a plaid scarf", 
-  "a soft towel", 
-  "a flower pot", 
-  "a small cactus", 
-  "vintage books", 
-  "a pen", 
-  "sneakers", 
-  "a bluetooth speaker", 
-  "a wide-brim hat", 
+  "a folded towel", 
+  "a small flower pot", 
+  "a small cactus pot", 
+  "a stack of books", 
+  "a fountain pen", 
+  "a pair of sneakers", 
+  "a portable speaker", 
+  "a fedora hat", 
   "a baseball cap", 
-  "daisy flowers", 
-  "red roses", 
-  "a tree branch", 
-  "blue jeans", 
-  "a gold necklace", 
-  "a photo frame"
+  "a daisy flower", 
+  "a single red rose", 
+  "a small green branch", 
+  "a pair of folded jeans", 
+  "a silver chain necklace", 
+  "an empty picture frame"
 ];
