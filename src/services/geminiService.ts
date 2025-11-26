@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import type { GeneratedImage, Color, ApparelType } from "../podTypes";
 import { getApiKey } from '../utils/apiKey';
@@ -29,8 +30,9 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
         contents: { parts: [imagePart, { text: prompt }] },
     });
 
+    // Safe check for response structure
     const candidates = response.candidates;
-    if (candidates && candidates.length > 0) {
+    if (candidates && candidates.length > 0 && candidates[0].content?.parts) {
         for (const part of candidates[0].content.parts) {
             if (part.inlineData) {
                 return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
@@ -42,7 +44,7 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
 
 const getRandomProps = (): string => {
     const shuffled = [...MOCKUP_PROPS].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, 3); // Pick 3 random items
+    const selected = shuffled.slice(0, 3); 
     return selected.join(", "); 
 };
 
@@ -50,13 +52,12 @@ export const generateVariations = async (file: File, selectedColors: Color[]): P
   const imagePart = await fileToGenerativePart(file);
   const promises = selectedColors.map(async (color) => {
     const prompt = `
-    ACT AS: Professional Product Retoucher.
-    TASK: Recolor the apparel in this image to ${color.name}.
-    RULES:
-    1. KEEP the original design/artwork 100% intact.
-    2. KEEP the background, shadows, and lighting exactly the same.
-    3. ONLY change the fabric color of the shirt/hoodie.
-    OUTPUT: High-quality photorealistic image.
+    TASK: Recolor the apparel to ${color.name}.
+    STRICT RULES:
+    1. Keep the original graphic design 100% identical.
+    2. Keep the background and lighting 100% identical.
+    3. Output a SINGLE, high-quality image.
+    4. DO NOT create a collage or split screen.
     `;
     
     try {
@@ -78,28 +79,30 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         const typeText = apparelType ? apparelType : "T-Shirt";
         const props = getRandomProps();
         
-        // 1. MODEL PROMPT
+        // 1. MODEL PROMPT (Lifestyle)
         const modelPrompt = `
-        ACT AS: Fashion Photographer.
-        TASK: Create a Lifestyle Model Mockup for this ${typeText}.
-        INPUT: Use the graphic design/artwork from the source image.
-        SCENE:
-        - Model: A realistic person wearing the ${typeText}.
-        - Pose: Natural, standing or sitting.
-        - Background: Blurred urban street or cozy cafe.
-        - ZOOM: CLOSE-UP on the chest area. The artwork must be HUGE and CLEAR.
+        ROLE: Fashion Photographer.
+        OBJECT: A realistic model wearing a ${typeText}.
+        DESIGN: Apply the artwork from the source image onto the chest of the ${typeText}.
+        SCENE: Urban street or cozy cafe background (Blurred).
+        CAMERA: Portrait shot, Close-up on the torso.
+        REQUIREMENT:
+        - The artwork must be LARGE, CLEAR, and CENTERED.
+        - Realistic fabric wrinkles and lighting.
+        - SINGLE IMAGE output only. NO Collage.
         `;
 
-        // 2. FLAT LAY PROMPT (With Props)
+        // 2. FLAT LAY PROMPT (With Mandatory Props)
         const flatLayPrompt = `
-        ACT AS: Professional Product Photographer.
-        TASK: Create a Stylized Flat Lay Mockup for this ${typeText}.
-        INPUT: Use the graphic design/artwork from the source image.
+        ROLE: Product Photographer.
+        OBJECT: A folded ${typeText} placed on a wooden or marble table.
+        DESIGN: Apply the artwork from the source image onto the ${typeText}.
+        PROPS (MANDATORY): You MUST place these items around the shirt: ${props}.
         COMPOSITION:
-        - Surface: Rustic wooden table or white marble.
-        - Center: The ${typeText} folded neatly.
-        - DECORATION (MANDATORY): You MUST place these items around the shirt: ${props}.
-        - ZOOM: TOP-DOWN CLOSE-UP. Fill the frame with the shirt and props.
+        - Top-down view (Flat lay).
+        - Zoom in closely to show the design detail.
+        - Props should act as a frame but NOT cover the design.
+        - SINGLE IMAGE output only. NO Collage.
         `;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
