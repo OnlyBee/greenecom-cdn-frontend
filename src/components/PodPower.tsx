@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { PodFeatureSelector } from './PodFeatureSelector';
 import { PodVariationGenerator } from './PodVariationGenerator';
@@ -63,7 +64,7 @@ const PodPower: React.FC = () => {
             <p className="text-gray-400 mt-1">AI Assistant for Print-On-Demand</p>
         </div>
 
-        {/* STATS TABLE - VISIBLE TO ALL FOR NOW */}
+        {/* STATS TABLE */}
         <div className="mb-8 bg-gray-800 p-4 rounded-lg border border-gray-700 max-w-4xl mx-auto">
             <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-bold text-white">📊 Usage Statistics</h3>

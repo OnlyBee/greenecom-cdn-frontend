@@ -1,12 +1,12 @@
+
 import type { User, Folder, ImageFile } from '../types';
 
 const API_BASE_URL = '/api';
 
-// --- Helper Functions ---
 const getToken = () => localStorage.getItem('greenecom_token');
 
 const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
-  const headers: any = { ...options.headers }; // FIX TS ERROR: Use any to allow arbitrary headers
+  const headers: any = { ...options.headers };
   const token = getToken();
   
   if (token && !(options.body instanceof FormData)) {
@@ -63,7 +63,6 @@ export const api = {
   deleteFolder: (id: string) => request(`/folders/${id}`, { method: 'DELETE' }),
   changePassword: (c: string, n: string) => request('/users/change-password', { method: 'PUT', body: JSON.stringify({ currentPassword: c, newPassword: n }) }),
 
-  // STATS
   recordUsage: (feature: string) => request('/stats/record', { method: 'POST', body: JSON.stringify({ feature }) }),
   getStats: () => request<any[]>('/stats'),
 };
