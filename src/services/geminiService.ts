@@ -18,7 +18,7 @@ const fileToGenerativePart = async (file: File) => {
   };
 };
 
-const getRandomProps = (count: number = 2): string => {
+const getRandomProps = (count: number = 3): string => {
   const shuffled = [...FLAT_LAY_PROPS].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, count).join(", ");
 };
@@ -29,10 +29,13 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
 
     const ai = new GoogleGenAI({ apiKey });
     
-    // System instruction to enforce text fidelity
-    const systemInstruction = `You are an expert product photographer and graphic designer. 
-    Your Highest Priority: PRESERVE THE GRAPHIC DESIGN AND TEXT ON THE APPAREL EXACTLY AS IT IS IN THE SOURCE IMAGE. 
-    Do not blur, distort, or misspell the text. The design must be crisp, high-contrast, and fully legible.`;
+    // System instruction to enforce text fidelity and style
+    const systemInstruction = `You are an expert product photographer for a high-end Etsy Print-on-Demand boutique.
+    
+    CORE RULES:
+    1. **TEXT FIDELITY IS PARAMOUNT**: The graphic design and text on the apparel must be preserved 100% pixel-perfect. Do not blur, distort, misspell, or hallucinate new text.
+    2. **STYLE**: Use natural window lighting, soft shadows, and high-resolution textures. Avoid "AI-looking" glossy skin.
+    3. **COMPOSITION**: strictly follow the layout instructions (Split-screen or Flat-lay).`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
@@ -71,37 +74,41 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         const typeStr = apparelType || "apparel";
         const randomDecor = getRandomProps(3); // Get 3 random props
 
-        // 1. Model Prompt (2 People, Front & Back/Side, Zoomed In)
+        // 1. Model Prompt: SPLIT-SCREEN COLLAGE (Giống hình mẫu user cung cấp)
         const modelPrompt = `
-            Create a photorealistic lifestyle mockup of **two models** wearing the same '${typeStr}'.
+            Create a professional **SPLIT-SCREEN COLLAGE** image (two panels stitched together side-by-side).
             
-            Composition:
-            - Model 1 (Front): Facing forward, occupying a large portion of the frame. The graphic design on the chest must be HUGE, CRISP, and perfectly readable. 
-            - Model 2 (Back/Side/Overlap): Standing slightly behind or beside, showing the back view or a side angle of the shirt.
-            - Overlap the models slightly to create a dynamic composition.
-            - Crop closely to the torsos to maximize the visibility of the '${typeStr}' design. Do not focus on faces.
+            **LEFT PANEL (Front View):**
+            - A photorealistic, close-up shot of a model wearing the '${typeStr}'.
+            - **CROP:** Focus tightly on the torso/chest area. The graphic design must be HUGE, CENTERED, and 100% READABLE.
+            - Do not show the model's full legs. Focus on the shirt.
             
-            Fidelity:
-            - The graphic design/text from the source image must be preserved 100% accurately. No typos. No blurring.
-            - Lighting: Professional studio or soft daylight.
+            **RIGHT PANEL (Back View):**
+            - A photorealistic shot of the model wearing the same '${typeStr}' from the back.
+            - If the original design is on the front, show the plain back. If the design is on the back, show the design clearly.
+            
+            **Overall Vibe:**
+            - "Boutique" aesthetic. Natural lighting. Neutral background (white wall or soft studio).
+            - The final image must look like a single 2-up collage used for online store listings.
         `;
 
-        // 2. Flat Lay Prompt (1 Spread, 1 Folded, Random Props)
+        // 2. Flat Lay Prompt: ETSY STYLE (1 Trải, 1 Gấp, Decor)
         const flatLayPrompt = `
-            Create a professional flat-lay photography composition of the '${typeStr}' on a neutral texture background.
+            Create a stylish **Etsy-style Flat Lay** product photography composition for the '${typeStr}'.
             
-            Composition:
-            - Item 1 (Main): The '${typeStr}' is spread out flat and center. The graphic design must be the main focus, large, and perfectly legible.
-            - Item 2 (Folded): A second '${typeStr}' is neatly folded beside it, showing the fabric texture.
-            - Decor: Randomly place these items around to create a lifestyle vibe, but do not obscure the design: ${randomDecor}.
+            **Layout:**
+            - **Main Item:** The '${typeStr}' is laid out flat in the center, perfectly smooth. The graphic design text must be sharp and legible.
+            - **Secondary Item:** A second '${typeStr}' (same color) is folded neatly on the side or corner.
+            - **Background:** A textured surface (white wood planks, concrete, or wrinkled linen sheet).
+            - **Decor:** Artistically arrange these specific props around the shirt to frame it: ${randomDecor}.
             
-            Fidelity:
-            - The text and artwork must be identical to the source image. Sharp edges, correct spelling.
+            **Lighting:**
+            - Soft, diffused daylight casting gentle shadows. No harsh flash.
         `;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
-        const modelPromise = generateImage(imagePart, modelPrompt).then(src => ({ src, name: `model${nameSuffix}_mockup.png` }));
-        const flatLayPromise = generateImage(imagePart, flatLayPrompt).then(src => ({ src, name: `flatlay${nameSuffix}_mockup.png` }));
+        const modelPromise = generateImage(imagePart, modelPrompt).then(src => ({ src, name: `model${nameSuffix}_collage.png` }));
+        const flatLayPromise = generateImage(imagePart, flatLayPrompt).then(src => ({ src, name: `flatlay${nameSuffix}_etsy.png` }));
         return [modelPromise, flatLayPromise];
     };
 
