@@ -1,6 +1,5 @@
-
 import React, { Suspense } from 'react';
-import { useAuth } from './hooks/useAuth';
+import { useAuth } from './contexts/AuthContext';
 
 // Lazy load components to prevent module loading errors from crashing the main entry point
 // and to break potential circular dependencies.
@@ -16,8 +15,6 @@ const GlobalLoading = () => (
 
 function App() {
   const { token, loading } = useAuth();
-
-  console.log("App Render: Auth Loading =", loading, ", Token present =", !!token);
 
   if (loading) {
     return (

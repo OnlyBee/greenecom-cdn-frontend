@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Folder, ImageFile, User } from '../types';
 import { Role } from '../types';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import Header from './Header';
 import UploadForm from './UploadForm';
 import ImageGrid from './ImageGrid';

@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login: React.FC = () => {
   const { login } = useAuth();

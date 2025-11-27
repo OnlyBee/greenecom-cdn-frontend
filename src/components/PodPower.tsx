@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { PodFeatureSelector } from './PodFeatureSelector';
 import { PodVariationGenerator } from './PodVariationGenerator';
@@ -6,7 +5,7 @@ import { PodMockupRemaker } from './PodMockupRemaker';
 import { PodApiKeyModal } from './PodApiKeyModal';
 import { getApiKey, setApiKey as saveApiKey, clearApiKey } from '../utils/apiKey';
 import type { Feature } from '../podTypes';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 
 const PodPower: React.FC = () => {

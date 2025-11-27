@@ -1,4 +1,3 @@
-
 import React, {
   createContext,
   useState,
@@ -23,7 +22,7 @@ export type AuthContextType = {
   logout: () => void;
 };
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const TOKEN_KEY = 'greenecom_token';
 const USER_KEY = 'greenecom_user';
@@ -158,10 +157,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuthContext = (): AuthContextType => {
+// Export hook directly from here to ensure single instance
+export const useAuth = (): AuthContextType => {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error('useAuthContext must be used within an AuthProvider');
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return ctx;
 };
+
+// Compatibility export if needed
+export const useAuthContext = useAuth;
