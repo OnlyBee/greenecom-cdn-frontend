@@ -1,7 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 import type { GeneratedImage, Color, ApparelType } from "../podTypes";
 import { getApiKey } from '../utils/apiKey';
-import { MOCKUP_PROPS } from '../podConstants';
+import { FLAT_LAY_PROPS } from '../podConstants';
 import { api } from './api';
 
 const fileToGenerativePart = async (file: File) => {
@@ -18,19 +18,29 @@ const fileToGenerativePart = async (file: File) => {
   };
 };
 
-const generateImage = async (imagePart: any, prompt: string): Promise<string> => {
+const generateImage = async (imagePart: any, prompt: string, aspectRatio: string = "1:1"): Promise<string> => {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API key not found. Please contact an admin.");
+    if (!apiKey) {
+      throw new Error("API key not found. Please contact Admin.");
+    }
 
     const ai = new GoogleGenAI({ apiKey });
     
+    // Sử dụng config chuẩn cho gemini-2.5-flash-image
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: { parts: [imagePart, { text: prompt }] },
+        contents: {
+            parts: [imagePart, { text: prompt }],
+        },
+        config: {
+            responseModalities: [Modality.IMAGE],
+            imageConfig: {
+                aspectRatio: aspectRatio,
+            }
+        },
     });
 
     const candidates = response.candidates;
-    // Sửa lỗi 'Object is possibly undefined' bằng cách kiểm tra kỹ
     if (candidates && candidates.length > 0 && candidates[0].content?.parts) {
         for (const part of candidates[0].content.parts) {
             if (part.inlineData) {
@@ -38,97 +48,103 @@ const generateImage = async (imagePart: any, prompt: string): Promise<string> =>
             }
         }
     }
-    // Nếu không có ảnh, thử tìm text để báo lỗi chi tiết hơn
-    const textResponse = response.text;
-    if (textResponse) {
-        throw new Error(`AI returned text instead of an image: "${textResponse.substring(0, 100)}..."`);
-    }
     
-    throw new Error("No image was generated. The AI might have refused the request.");
+    throw new Error("No image was generated.");
 };
 
 const getRandomProps = (): string => {
-    const shuffled = [...MOCKUP_PROPS].sort(() => 0.5 - Math.random());
-    // Chọn 2 hoặc 3 vật phẩm
+    const shuffled = [...FLAT_LAY_PROPS].sort(() => 0.5 - Math.random());
     const count = Math.floor(Math.random() * 2) + 2; 
-    const selected = shuffled.slice(0, count); 
-    return selected.join(", "); 
+    const selected = shuffled.slice(0, count);
+    
+    if (selected.length === 0) return "";
+    if (selected.length === 1) return selected[0];
+    const last = selected.pop();
+    return `${selected.join(", ")} and ${last}`;
 };
 
 export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
   const imagePart = await fileToGenerativePart(file);
+  
   const promises = selectedColors.map(async (color) => {
-    const prompt = `
-    TASK: Change the color of the apparel item to '${color.name}'.
-    STRICT RULES:
-    1. The graphic design printed on the apparel MUST be preserved perfectly.
-    2. The background, lighting, and any other objects MUST NOT be altered.
-    3. The output MUST be a single, high-quality image. NO COLLAGES.
-    `;
+    const prompt = `Analyze the apparel in the provided image. The design on the apparel must be preserved perfectly. The task is to change ONLY the color of the apparel itself to '${color.name}'. Do not alter the background, any other objects, or the design printed on the apparel. The output must be an image.`;
     
     try {
-        const src = await generateImage(imagePart, prompt);
-        api.recordUsage('variation').catch(console.warn);
-        return { src, name: `${color.name.replace(/\s+/g, '_')}_variation.png` };
-    } catch (e) { 
-        console.error(`Failed to generate variation for ${color.name}:`, e);
-        throw e; 
+        const src = await generateImage(imagePart, prompt, "1:1");
+        // Tracking
+        api.recordUsage('variation').catch(e => console.warn('Tracking failed', e));
+        return { src, name: `${color.name}.png` };
+    } catch (e) {
+        console.error(e);
+        throw e;
     }
   });
+
   return Promise.all(promises);
 };
 
 export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Promise<GeneratedImage[]> => {
     const imagePart = await fileToGenerativePart(file);
-    
+
     const createMockupPromises = (apparelType: ApparelType | null): Promise<GeneratedImage>[] => {
-        const typeText = apparelType || "T-Shirt"; // Mặc định là T-shirt nếu không chọn
+        // Core instruction from your POD Power app
+        const basePrompt = `You are an expert product photographer. 
+        TASK: Extract the GRAPHIC DESIGN/ARTWORK from the source image and apply it to a BRAND NEW apparel mockup.
+        CRITICAL: 
+        1. Do NOT use the original background. Create a completely NEW environment.
+        2. Do NOT use the original person/model. Use a NEW model or NEW pose.
+        3. Keep the graphic design exactly as is (colors, details), but realistic lighting must apply to it.`;
+
+        const typeStr = apparelType || "apparel";
+        const apparelInstruction = `The item is a ${typeStr}.`;
+
         const randomProps = getRandomProps();
-        
-        // PROMPT MẠNH MẼ HƠN
-        const modelPrompt = `
-        ROLE: Professional Fashion Photographer.
-        TASK: Create a photorealistic lifestyle mockup of a person wearing a ${typeText}.
-        
-        CRITICAL INSTRUCTIONS:
-        1.  **IGNORE ORIGINAL BACKGROUND**: Create a completely new, clean, blurred background (e.g., urban street, modern cafe, or minimalist studio).
-        2.  **APPLY DESIGN**: Extract the graphic design from the source image and place it realistically on the chest of the new ${typeText}.
-        3.  **VIEW**: Use an **EXTREME CLOSE-UP** shot, framed from the waist up. The graphic design MUST be the main focus, large and clear.
-        4.  **FORMAT**: SINGLE IMAGE ONLY. NO COLLAGES.
-        `;
 
-        const flatLayPrompt = `
-        ROLE: Professional Product Photographer.
-        TASK: Create a professional flat lay mockup of a single, folded ${typeText}.
-
-        CRITICAL INSTRUCTIONS:
-        1.  **BACKGROUND**: The apparel must be placed on a clean, textured surface like a light wooden table or white marble. **IGNORE THE ORIGINAL BACKGROUND**.
-        2.  **MANDATORY PROPS**: You MUST include these 3 items in the scene, arranged naturally around the apparel: **${randomProps}**. The props must not cover the main graphic design.
-        3.  **APPLY DESIGN**: Place the graphic design from the source image clearly on the folded ${typeText}.
-        4.  **VIEW**: Use a **TOP-DOWN, EXTREME CLOSE-UP** view. The graphic design must be the main focus and highly detailed.
-        5.  **FORMAT**: SINGLE IMAGE ONLY. NO COLLAGES.
-        `;
+        // 1. Model Prompt
+        const modelPrompt = `${basePrompt} ${apparelInstruction}
+        SCENE: A lifestyle fashion shot.
+        SUBJECT: Generate a composite image showing TWO angles of a model wearing this ${typeStr}.
+        - Figure A (Front): A model facing forward, clearly displaying the design on the FRONT.
+        - Figure B (Back): The SAME model standing turned around (back to camera) to show the BACK of the item.
+        COMPOSITION: 
+        - The two figures should stand close together, slightly overlapping.
+        - Zoom in to frame them from mid-thigh up.
+        - FOCUS: The Graphic Design must be large, readable, and the center of attention.`;
+        
+        // 2. Flat-lay Prompt
+        const flatLayPrompt = `${basePrompt} ${apparelInstruction}
+        SCENE: A professional flat-lay photography on a specific surface (e.g., wooden table, concrete, or marble).
+        SUBJECT: Arrange TWO ${typeStr}s on the surface.
+        - Item 1: Unfolded or neatly arranged showing the FRONT design.
+        - Item 2: Folded or laid next to Item 1, showing the BACK of the apparel.
+        COMPOSITION:
+        - Place them close together to fill the frame.
+        - Do not zoom out too far; crop tightly around the shirts.
+        DECORATION: Stylize the scene with ${randomProps} placed naturally around.`;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
-        
-        const modelPromise = generateImage(imagePart, modelPrompt).then(src => {
+
+        const modelPromise = generateImage(imagePart, modelPrompt, "1:1").then(src => {
             api.recordUsage('mockup').catch(console.warn);
-            return { src, name: `model${nameSuffix}.png` };
+            return { src, name: `model${nameSuffix}_double_sided.png` };
         });
-        
-        const flatLayPromise = generateImage(imagePart, flatLayPrompt).then(src => {
+        const flatLayPromise = generateImage(imagePart, flatLayPrompt, "1:1").then(src => {
             api.recordUsage('mockup').catch(console.warn);
-            return { src, name: `flatlay${nameSuffix}_with_props.png` };
+            return { src, name: `flatlay${nameSuffix}_double_sided.png` };
         });
 
         return [modelPromise, flatLayPromise];
     };
 
     let allPromises: Promise<GeneratedImage>[] = [];
+
     if (apparelTypes.length === 0) {
         allPromises = createMockupPromises(null);
     } else {
-        apparelTypes.forEach(type => allPromises.push(...createMockupPromises(type)));
+        apparelTypes.forEach(type => {
+            allPromises.push(...createMockupPromises(type));
+        });
     }
+
     return Promise.all(allPromises);
 };

@@ -5,7 +5,7 @@ import { PodImageGrid } from './PodImageGrid';
 import { PodSpinner } from './PodSpinner';
 import { generateVariations } from '../services/geminiService';
 import { VARIATION_COLORS } from '../podConstants';
-import type { GeneratedImage, Color } from '../podTypes';
+import type { GeneratedImage, Color } from '../types';
 
 interface VariationGeneratorProps {
   onApiError: () => void;

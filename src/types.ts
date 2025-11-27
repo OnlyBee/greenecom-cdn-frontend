@@ -25,6 +25,7 @@ export interface Folder {
   assigned_users?: { id: string; username: string }[];
 }
 
+// POD Types
 export type Feature = 'variation' | 'mockup';
 
 export interface GeneratedImage {

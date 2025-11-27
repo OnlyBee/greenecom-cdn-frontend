@@ -1,35 +1,32 @@
 {
-  "name": "greenecom-cdn-manager",
+  "name": "greenecom-cdn-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "engines": {
-    "node": "20.x"
-  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "@google/genai": "*",
-    "lucide-react": "^0.468.0",
     "jszip": "^3.10.1",
     "file-saver": "^2.0.5"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@types/file-saver": "^2.0.7",
     "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.1",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
-    "typescript": "^5.5.3",
-    "vite": "^5.4.1"
+    "@types/file-saver": "^2.0.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

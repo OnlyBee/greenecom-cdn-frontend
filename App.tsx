@@ -1,24 +1,71 @@
-import React from 'react';
-import { useAuth } from './hooks/useAuth';
-import Login from './components/Login';
-import Dashboard from './components/Dashboard';
+import React, { useState, useEffect, useCallback } from 'react';
+import Header from './components/Header';
+import { FeatureSelector } from './components/FeatureSelector';
+import { VariationGenerator } from './components/VariationGenerator';
+import { MockupRemaker } from './components/MockupRemaker';
+import { ApiKeyModal } from './components/ApiKeyModal';
+import { getApiKey, setApiKey, clearApiKey } from './utils/apiKey';
+import type { Feature } from './types';
 
-function App() {
-  const { user, loading } = useAuth();
+const App: React.FC = () => {
+  const [selectedFeature, setSelectedFeature] = useState<Feature>('variation');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [apiKey, setApiKeyState] = useState<string | null>(null);
 
-  if (loading) {
+  useEffect(() => {
+    const existingKey = getApiKey();
+    if (existingKey) {
+      setApiKeyState(existingKey);
+    } else {
+      setIsApiKeyModalOpen(true);
+    }
+  }, []);
+
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    setApiKeyState(key);
+    setIsApiKeyModalOpen(false);
+  };
+
+  const handleApiError = useCallback(() => {
+    clearApiKey();
+    setApiKeyState(null);
+    setIsApiKeyModalOpen(true);
+  }, []);
+
+  // Nếu chưa có key, chỉ hiển thị modal trên nền trống
+  if (!apiKey) {
     return (
-      <div className="min-h-screen bg-gray-900 text-gray-100 flex items-center justify-center">
-        <p className="text-sm text-gray-300">Loading...</p>
+      <div className="min-h-screen bg-base-100">
+        <ApiKeyModal
+          isOpen={isApiKeyModalOpen}
+          onClose={() => { /* Không cho phép đóng modal nếu chưa có key */ }}
+          onSave={handleSaveApiKey}
+        />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 font-sans">
-      {user ? <Dashboard /> : <Login />}
+    <div className="min-h-screen bg-base-100 font-sans">
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        onSave={handleSaveApiKey}
+      />
+      <Header />
+      <main className="container mx-auto px-4 py-8">
+        <FeatureSelector
+          selectedFeature={selectedFeature}
+          onSelectFeature={setSelectedFeature}
+        />
+        <div className="mt-8">
+          {selectedFeature === 'variation' && <VariationGenerator onApiError={handleApiError} />}
+          {selectedFeature === 'mockup' && <MockupRemaker onApiError={handleApiError} />}
+        </div>
+      </main>
     </div>
   );
-}
+};
 
 export default App;

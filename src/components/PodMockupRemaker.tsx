@@ -4,7 +4,7 @@ import { PodImageUploader } from './PodImageUploader';
 import { PodImageGrid } from './PodImageGrid';
 import { PodSpinner } from './PodSpinner';
 import { remakeMockups } from '../services/geminiService';
-import type { GeneratedImage, ApparelType } from '../podTypes';
+import type { GeneratedImage, ApparelType } from '../types';
 
 const APPAREL_TYPES: ApparelType[] = ['T-shirt', 'Hoodie', 'Sweater'];
 
