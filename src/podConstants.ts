@@ -36,3 +36,24 @@ export const VARIATION_COLORS: Color[] = [
   { name: "Violet", value: "VIOLET", hex: "#8F00FF" },
   { name: "Yellow Haze", value: "YELLOW HAZE", hex: "#FCE205" },
 ];
+
+export const FLAT_LAY_PROPS = [
+  "checkered scarf",
+  "white scarf",
+  "flower pot",
+  "vase with fresh flowers",
+  "single flower stem",
+  "dried branch",
+  "wristwatch",
+  "round wall clock",
+  "luxury pen",
+  "minimalist photo frame",
+  "blue jeans",
+  "bluetooth speaker",
+  "silver necklace",
+  "baseball cap",
+  "cowboy hat",
+  "coffee mug",
+  "reading glasses",
+  "palm leaf branch"
+];

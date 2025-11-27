@@ -16,9 +16,9 @@ const TrashIcon = () => (
     </svg>
 );
 
-const ChartIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
+const RefreshIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
     </svg>
 );
 
@@ -38,12 +38,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
 
   const [stats, setStats] = useState<UsageStat[]>([]);
   
-  useEffect(() => {
-    // Fetch stats separately to avoid bloat in parent component
+  const fetchStats = () => {
     api.getUsageStats()
       .then(setStats)
       .catch(console.error);
-  }, []); // Run once on mount
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   const handleCreateUser = async () => {
     if (!newUsername || !newPassword) {
@@ -144,24 +147,48 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
 
   return (
     <div className="bg-gray-800 rounded-lg shadow-xl p-4">
-      <div className="flex justify-between items-center mb-3">
-        <h2 className="text-xl font-bold text-white">Admin Panel</h2>
-        {/* Stats Summary */}
-        <div className="flex space-x-4 bg-gray-900/50 p-2 rounded-lg border border-gray-700">
-           {stats.length > 0 ? stats.map(stat => (
-               <div key={stat.feature_name} className="flex flex-col items-center px-2">
-                   <span className="text-[10px] uppercase text-gray-400 font-bold tracking-wider">{stat.feature_name}</span>
-                   <span className="text-lg font-bold text-purple-400">{stat.usage_count}</span>
-               </div>
-           )) : (
-               <span className="text-xs text-gray-500 px-2 italic">No usage stats</span>
-           )}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+            <h2 className="text-xl font-bold text-white">Admin Panel</h2>
+            <div className="flex space-x-3 mt-2">
+                <button onClick={() => setUserModalOpen(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm text-white font-semibold">Create User</button>
+                <button onClick={() => setFolderModalOpen(true)} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded text-sm text-white font-semibold">Create Folder</button>
+            </div>
         </div>
-      </div>
-      
-      <div className="flex space-x-3 mb-4">
-        <button onClick={() => setUserModalOpen(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm text-white font-semibold">Create User</button>
-        <button onClick={() => setFolderModalOpen(true)} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded text-sm text-white font-semibold">Create Folder</button>
+
+        {/* Stats Table */}
+        <div className="bg-gray-900 rounded-lg p-3 border border-gray-700 w-full md:w-auto min-w-[300px]">
+            <div className="flex justify-between items-center mb-2">
+                <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wide">Usage Statistics</h3>
+                <button onClick={fetchStats} className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-800"><RefreshIcon/></button>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left text-gray-300">
+                    <thead className="text-xs text-gray-500 uppercase bg-gray-800">
+                        <tr>
+                            <th className="px-3 py-1.5">Feature</th>
+                            <th className="px-3 py-1.5 text-right">Count</th>
+                            <th className="px-3 py-1.5 text-right">Last Used</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {stats.length > 0 ? stats.map(stat => (
+                            <tr key={stat.feature_name} className="border-b border-gray-800 hover:bg-gray-800/50">
+                                <td className="px-3 py-2 font-medium text-white capitalize">{stat.feature_name}</td>
+                                <td className="px-3 py-2 text-right font-bold text-green-400">{stat.usage_count}</td>
+                                <td className="px-3 py-2 text-right text-xs text-gray-500">
+                                    {new Date(stat.last_used_at).toLocaleDateString()}
+                                </td>
+                            </tr>
+                        )) : (
+                            <tr>
+                                <td colSpan={3} className="px-3 py-4 text-center text-gray-500 italic">No usage data yet</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
       </div>
       
       <div className="grid md:grid-cols-2 gap-4">
