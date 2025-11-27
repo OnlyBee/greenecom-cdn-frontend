@@ -37,11 +37,19 @@ type DecodedToken = {
 };
 
 function decodeToken(token: string): DecodedToken | null {
+  if (!token || typeof token !== 'string') return null;
   try {
-    const [, payload] = token.split('.');
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    
+    const payload = parts[1];
+    if (!payload) return null;
+
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(base64);
     return JSON.parse(json);
-  } catch {
+  } catch (e) {
+    console.error("Failed to decode token", e);
     return null;
   }
 }
@@ -52,36 +60,48 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem(TOKEN_KEY);
+    try {
+        const storedToken = localStorage.getItem(TOKEN_KEY);
 
-    if (storedToken) {
-      const decoded = decodeToken(storedToken);
-      
-      if (decoded && decoded.id && decoded.exp * 1000 > Date.now()) {
-        setToken(storedToken);
-        
-        let username = decoded.username || 'User';
-        try {
-             const oldUserStorage = JSON.parse(localStorage.getItem(USER_KEY) || '{}');
-             if (oldUserStorage.username) username = oldUserStorage.username;
-        } catch {}
+        if (storedToken) {
+          const decoded = decodeToken(storedToken);
+          
+          if (decoded && decoded.id && decoded.exp * 1000 > Date.now()) {
+            setToken(storedToken);
+            
+            let username = decoded.username || 'User';
+            try {
+                const oldUserStorage = localStorage.getItem(USER_KEY);
+                if (oldUserStorage) {
+                    const parsed = JSON.parse(oldUserStorage);
+                    if (parsed.username) username = parsed.username;
+                }
+            } catch (e) {
+                console.warn("Failed to parse user storage", e);
+            }
 
-        const restoredUser: User = {
-            id: decoded.id,
-            role: decoded.role,
-            username: username
-        };
+            const restoredUser: User = {
+                id: decoded.id,
+                role: decoded.role,
+                username: username
+            };
 
-        setUser(restoredUser);
-        localStorage.setItem(USER_KEY, JSON.stringify(restoredUser));
-      } else {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-        setToken(null);
-        setUser(null);
-      }
+            setUser(restoredUser);
+            localStorage.setItem(USER_KEY, JSON.stringify(restoredUser));
+          } else {
+            // Token invalid or expired
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            setToken(null);
+            setUser(null);
+          }
+        }
+    } catch (e) {
+        console.error("Auth initialization error", e);
+        localStorage.clear();
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (username: string, password: string) => {
@@ -104,7 +124,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const decoded = decodeToken(tokenFromServer);
     if (!decoded) {
-      throw new Error('Invalid token');
+      throw new Error('Invalid token received');
     }
 
     const loggedUser: User = {
