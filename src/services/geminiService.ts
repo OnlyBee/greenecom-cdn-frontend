@@ -1,7 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import type { GeneratedImage, Color, ApparelType } from "../podTypes";
 import { getApiKey } from '../utils/apiKey';
-import { FLAT_LAY_PROPS } from '../podConstants';
 
 const fileToGenerativePart = async (file: File) => {
   const base64EncodedDataPromise = new Promise<string>((resolve) => {
@@ -17,58 +16,43 @@ const fileToGenerativePart = async (file: File) => {
   };
 };
 
-const getRandomProps = (count: number = 3): string => {
-  const shuffled = [...FLAT_LAY_PROPS].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count).join(", ");
-};
-
-const generateImage = async (imagePart: any, prompt: string, isCollage: boolean = false): Promise<string> => {
+const generateImage = async (imagePart: any, prompt: string, aspectRatio: string = "1:1"): Promise<string> => {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error("API key not found.");
 
     const ai = new GoogleGenAI({ apiKey });
     
-    // System instruction to enforce text fidelity and style
-    const systemInstruction = `You are an expert product photographer for a high-end Etsy Print-on-Demand boutique.
-    
-    CORE RULES:
-    1. **TEXT FIDELITY IS PARAMOUNT**: The graphic design and text on the apparel must be preserved 100% pixel-perfect. Do not blur, distort, misspell, or hallucinate new text.
-    2. **STYLE**: Use natural window lighting, soft shadows, and high-resolution textures. Avoid "AI-looking" glossy skin.
-    3. **COMPOSITION**: strictly follow the layout instructions.`;
+    // System instruction to ensure text fidelity
+    const systemInstruction = `You are a professional product photographer. 
+    Your Highest Priority: PRESERVE THE GRAPHIC DESIGN TEXT AND ARTWORK 100%. 
+    Do not misspell, blur, or alter the design on the shirt.`;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-image-preview',
+        model: 'gemini-3-pro-image-preview', // Using Pro model for better adherence to "2 items" instructions
         contents: {
             parts: [imagePart, { text: prompt }],
         },
         config: {
             systemInstruction: systemInstruction,
             imageConfig: {
-                imageSize: "1K",
-                aspectRatio: isCollage ? "4:3" : "1:1" // Use 4:3 for collages/flatlays to give more room
+                aspectRatio: aspectRatio,
+                imageSize: "1K"
             }
         }
     });
 
-    // Iterate through all parts to find the image
-    const parts = response.candidates?.[0]?.content?.parts;
-    if (parts) {
-        for (const part of parts) {
-            if (part.inlineData) {
-                 return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            }
-        }
-        
-        // If no image found, check for text (error message from model)
-        const textPart = parts.find(p => p.text);
-        if (textPart && textPart.text) {
-            console.warn("Model returned text instead of image:", textPart.text);
-            // Throw a more descriptive error if possible, but keep it user friendly
-            throw new Error(`Model refused to generate image. Reason: ${textPart.text.substring(0, 50)}...`);
-        }
+    const firstPart = response.candidates?.[0]?.content?.parts?.[0];
+    if (firstPart && 'inlineData' in firstPart && firstPart.inlineData) {
+        return `data:${firstPart.inlineData.mimeType};base64,${firstPart.inlineData.data}`;
+    }
+    
+    // Check for text error response
+    const textPart = response.candidates?.[0]?.content?.parts?.find(p => p.text);
+    if (textPart && textPart.text) {
+        throw new Error(`Model Error: ${textPart.text.substring(0, 100)}`);
     }
 
-    throw new Error("No image was generated. Please try again.");
+    throw new Error("No image was generated.");
 };
 
 export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
@@ -77,62 +61,94 @@ export const generateVariations = async (file: File, selectedColors: Color[]): P
     const prompt = `Professional product photography. Change the color of the T-shirt/apparel to '${color.name}'. 
     CRITICAL: Keep the printed graphic design and text EXACTLY the same as the original image. 
     Do not change the background. High resolution, realistic texture.`;
-    const src = await generateImage(imagePart, prompt, false);
+    const src = await generateImage(imagePart, prompt, "1:1");
     return { src, name: `${color.name}.png` };
   });
   return Promise.all(promises);
 };
 
+const FLAT_LAY_PROPS = [
+    "jeans", "a flower pot", "a tree branch", "a plain scarf", "a plaid scarf", 
+    "sneakers", "a wool cardigan", "a hat", "glasses", "a watch", "a gift box", 
+    "a glass jar", "a cup", "a flower branch", "pampas grass"
+];
+
+const getRandomProps = (): string => {
+    const shuffled = [...FLAT_LAY_PROPS].sort(() => 0.5 - Math.random());
+    const count = Math.floor(Math.random() * 2) + 2; 
+    const selected = shuffled.slice(0, count);
+    if (selected.length === 0) return "";
+    if (selected.length === 1) return selected[0];
+    const last = selected.pop();
+    return `${selected.join(", ")} and ${last}`;
+};
+
 export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Promise<GeneratedImage[]> => {
     const imagePart = await fileToGenerativePart(file);
-    
+
     const createMockupPromises = (apparelType: ApparelType | null): Promise<GeneratedImage>[] => {
+        const basePrompt = `You are an expert product photographer. 
+        TASK: Extract the GRAPHIC DESIGN/ARTWORK from the source image and apply it to a BRAND NEW apparel mockup.
+        CRITICAL: 
+        1. Do NOT use the original background. Create a completely NEW environment.
+        2. Keep the graphic design exactly as is (colors, details), but apply realistic fabric folding and lighting to it.`;
+
         const typeStr = apparelType || "apparel";
-        const randomDecor = getRandomProps(3); // Get 3 random props
+        const apparelInstruction = `The item is a ${typeStr}.`;
+        const randomProps = getRandomProps();
 
-        // 1. Model Prompt: SPLIT-SCREEN COLLAGE (Giống hình mẫu user cung cấp)
-        const modelPrompt = `
-            Create a professional **SPLIT-SCREEN COLLAGE** image (two panels stitched together side-by-side).
-            
-            **LEFT PANEL (Front View):**
-            - A photorealistic, close-up shot of a model wearing the '${typeStr}'.
-            - **CROP:** Focus tightly on the torso/chest area. The graphic design must be HUGE, CENTERED, and 100% READABLE.
-            - Do not show the model's full legs. Focus on the shirt.
-            
-            **RIGHT PANEL (Back View):**
-            - A photorealistic shot of the model wearing the same '${typeStr}' from the back.
-            - If the original design is on the front, show the plain back. If the design is on the back, show the design clearly.
-            
-            **Overall Vibe:**
-            - "Boutique" aesthetic. Natural lighting. Neutral background (white wall or soft studio).
-            - The final image must look like a single 2-up collage used for online store listings.
-        `;
-
-        // 2. Flat Lay Prompt: ETSY STYLE (1 Trải, 1 Gấp, Decor)
-        const flatLayPrompt = `
-            Create a stylish **Etsy-style Flat Lay** product photography composition for the '${typeStr}'.
-            
-            **Layout:**
-            - **Main Item:** The '${typeStr}' is laid out flat in the center, perfectly smooth. The graphic design text must be sharp and legible.
-            - **Secondary Item:** A second '${typeStr}' (same color) is folded neatly on the side or corner.
-            - **Background:** A textured surface (white wood planks, concrete, or wrinkled linen sheet).
-            - **Decor:** Artistically arrange these specific props around the shirt to frame it: ${randomDecor}.
-            
-            **Lighting:**
-            - Soft, diffused daylight casting gentle shadows. No harsh flash.
-        `;
+        // 1. Model Prompt: SPLIT-SCREEN COMPOSITE
+        // Use 4:3 aspect ratio for side-by-side shots
+        const modelPrompt = `${basePrompt} ${apparelInstruction}
+        SCENE: A high-end lifestyle fashion shot.
+        GENERATE: A **Split-Screen Composite Image** (Left Half + Right Half).
+        
+        LEFT PANEL:
+        - Front view of a model wearing the ${typeStr}.
+        - **ZOOM IN** on the torso/chest. The Design must be LARGE and CLEAR.
+        
+        RIGHT PANEL:
+        - Back view of the SAME model wearing the ${typeStr}.
+        - Shows the back of the shirt.
+        
+        Background: Clean, neutral, boutique style.`;
+        
+        // 2. Flat-lay Prompt: TWO ITEMS (Front & Back)
+        // Stronger instruction for "Two Items"
+        const flatLayPrompt = `${basePrompt} ${apparelInstruction}
+        SCENE: A professional flat-lay photography on a textured surface.
+        GENERATE: An image containing **TWO SEPARATE ${typeStr}s** laid out together.
+        
+        ITEM 1 (Main):
+        - Unfolded ${typeStr} showing the FRONT design.
+        - Placed centrally or to the left.
+        
+        ITEM 2 (Secondary):
+        - Folded ${typeStr} placed next to Item 1.
+        - Shows the BACK or a folded detail.
+        
+        DECORATION: Stylize the scene with ${randomProps} placed naturally around.
+        Ensure both items are visible and distinct.`;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
-        const modelPromise = generateImage(imagePart, modelPrompt, true).then(src => ({ src, name: `model${nameSuffix}_collage.png` }));
-        const flatLayPromise = generateImage(imagePart, flatLayPrompt, true).then(src => ({ src, name: `flatlay${nameSuffix}_etsy.png` }));
+
+        // Using 4:3 for Model to allow side-by-side room
+        const modelPromise = generateImage(imagePart, modelPrompt, "4:3").then(src => ({ src, name: `model${nameSuffix}_double.png` }));
+        // Using 4:3 for Flatlay to allow room for 2 items
+        const flatLayPromise = generateImage(imagePart, flatLayPrompt, "4:3").then(src => ({ src, name: `flatlay${nameSuffix}_double.png` }));
+
         return [modelPromise, flatLayPromise];
     };
 
     let allPromises: Promise<GeneratedImage>[] = [];
+
     if (apparelTypes.length === 0) {
         allPromises = createMockupPromises(null);
     } else {
-        apparelTypes.forEach(type => allPromises.push(...createMockupPromises(type)));
+        apparelTypes.forEach(type => {
+            allPromises.push(...createMockupPromises(type));
+        });
     }
+
     return Promise.all(allPromises);
 };
