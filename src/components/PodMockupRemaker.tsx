@@ -5,7 +5,6 @@ import { PodImageGrid } from './PodImageGrid';
 import { PodSpinner } from './PodSpinner';
 import { remakeMockups } from '../services/geminiService';
 import type { GeneratedImage, ApparelType } from '../podTypes';
-import { api } from '../services/api';
 
 const APPAREL_TYPES: ApparelType[] = ['T-shirt', 'Hoodie', 'Sweater'];
 
@@ -41,14 +40,6 @@ export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) =
     try {
       const images = await remakeMockups(selectedFile, selectedApparelTypes);
       setGeneratedImages(images);
-
-      // Tracking usage
-      try {
-        await api.trackUsage('mockup');
-      } catch (e) {
-        console.error("Failed to track usage", e);
-      }
-
     } catch (err: any) {
       console.error(err);
       const rawMsg = err.message || err.toString();

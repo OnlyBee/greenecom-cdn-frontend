@@ -6,7 +6,6 @@ import { PodSpinner } from './PodSpinner';
 import { generateVariations } from '../services/geminiService';
 import { VARIATION_COLORS } from '../podConstants';
 import type { GeneratedImage, Color } from '../podTypes';
-import { api } from '../services/api';
 
 interface VariationGeneratorProps {
   onApiError: () => void;
@@ -44,14 +43,6 @@ export const PodVariationGenerator: React.FC<VariationGeneratorProps> = ({ onApi
     try {
       const images = await generateVariations(selectedFile, selectedColors);
       setGeneratedImages(images);
-      
-      // Tracking usage
-      try {
-          await api.trackUsage('variation');
-      } catch (e) {
-          console.error("Failed to track usage", e);
-      }
-
     } catch (err: any) {
       console.error(err);
       const rawMsg = err.message || err.toString();

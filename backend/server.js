@@ -115,7 +115,7 @@ app.post(['/login', '/api/login'], async (req, res) => {
   }
 });
 
-// 2. Users (Updated to include stats)
+// 2. Users
 app.get(['/users', '/api/users'], authenticateToken, isAdmin, async (req, res) => {
   try {
     const query = `
@@ -123,8 +123,6 @@ app.get(['/users', '/api/users'], authenticateToken, isAdmin, async (req, res) =
         u.id, 
         u.username, 
         u.role,
-        COALESCE(u.variation_count, 0) as variation_count,
-        COALESCE(u.mockup_count, 0) as mockup_count,
         COALESCE(
           json_agg(json_build_object('id', f.id, 'name', f.name)) 
           FILTER (WHERE f.id IS NOT NULL), 
@@ -175,25 +173,6 @@ app.put(['/users/change-password', '/api/users/change-password'], authenticateTo
     await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHashedPassword, userId]);
     res.json({ message: 'Updated' });
   } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// --- TRACK USAGE (NEW) ---
-app.post(['/track-usage', '/api/track-usage'], authenticateToken, async (req, res) => {
-    const { feature } = req.body; // 'variation' or 'mockup'
-    const userId = req.user.id;
-
-    try {
-        if (feature === 'variation') {
-            await pool.query('UPDATE users SET variation_count = COALESCE(variation_count, 0) + 1 WHERE id = $1', [userId]);
-        } else if (feature === 'mockup') {
-            await pool.query('UPDATE users SET mockup_count = COALESCE(mockup_count, 0) + 1 WHERE id = $1', [userId]);
-        }
-        res.json({ success: true });
-    } catch (e) {
-        // If column doesn't exist, we just ignore for now to prevent app crash, or log it
-        console.error("Failed to track usage (make sure DB has variation_count/mockup_count columns):", e.message);
-        res.status(500).json({ error: e.message });
-    }
 });
 
 // 3. Folders

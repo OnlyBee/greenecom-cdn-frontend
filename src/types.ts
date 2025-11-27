@@ -9,8 +9,6 @@ export interface User {
   username: string;
   role: Role;
   assigned_folders?: { id: string; name: string }[];
-  variation_count?: number;
-  mockup_count?: number;
 }
 
 export interface ImageFile {

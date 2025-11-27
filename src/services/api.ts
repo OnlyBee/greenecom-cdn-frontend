@@ -145,10 +145,4 @@ export const api = {
   deleteFolder: (folderId: string) => request<void>(`/folders/${folderId}`, {
     method: 'DELETE',
   }),
-
-  // Add Tracking
-  trackUsage: (feature: 'variation' | 'mockup') => request<void>('/track-usage', {
-    method: 'POST',
-    body: JSON.stringify({ feature }),
-  }),
 };

@@ -142,15 +142,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
                 {memberUsers.map(user => 
                     <li key={user.id} className="p-2 flex flex-col space-y-1 hover:bg-gray-700/80">
                         <div className="flex justify-between items-center">
-                            <div>
-                                <span className="font-medium text-white text-sm block">{user.username}</span>
-                                <span className="text-[10px] text-gray-400">
-                                    Uses: Var({user.variation_count || 0}) | Mockup({user.mockup_count || 0})
-                                </span>
-                            </div>
+                            <span className="font-medium text-white text-sm">{user.username}</span>
                             <button onClick={() => handleDeleteUser(user.id, user.username)} className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-gray-600"><TrashIcon /></button>
                         </div>
-                        <div className="flex flex-wrap gap-1 mt-1">
+                        <div className="flex flex-wrap gap-1">
                              {user.assigned_folders && user.assigned_folders.length > 0 ? (
                                 user.assigned_folders.map(f => (
                                     <span key={f.id} className="flex items-center px-1.5 py-0.5 rounded text-[10px] bg-gray-600 text-gray-200 border border-gray-500 group">
