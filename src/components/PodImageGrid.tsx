@@ -66,14 +66,14 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
             <div className="bg-gray-900 p-4 flex justify-between items-center border-t border-gray-600">
                 <button 
                     onClick={() => setPreviewImage(image)}
-                    className="flex-1 flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-l-lg border-r border-blue-700 transition-colors"
+                    className="flex-1 flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-l-lg border-r border-blue-700 transition-colors font-medium"
                 >
                     <EyeIcon /> Preview
                 </button>
                 <a
                     href={image.src}
                     download={image.name}
-                    className="flex-1 flex justify-center items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-r-lg transition-colors"
+                    className="flex-1 flex justify-center items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-r-lg transition-colors font-medium"
                 >
                     <DownloadIcon /> Save
                 </a>

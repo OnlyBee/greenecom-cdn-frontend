@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ImageUploader } from './ImageUploader';
-import ImageGrid from './ImageGrid';
+import { PodImageGrid } from './PodImageGrid';
 import { Spinner } from './Spinner';
 import { remakeMockups } from '../services/geminiService';
 import type { GeneratedImage, ApparelType } from '../types';
@@ -128,7 +128,7 @@ export const MockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
 
       {error && <p className="mt-4 text-center text-red-400">{error}</p>}
 
-      <ImageGrid images={generatedImages} onDelete={() => {}} onRename={() => {}} />
+      <PodImageGrid images={generatedImages} />
     </div>
   );
 };

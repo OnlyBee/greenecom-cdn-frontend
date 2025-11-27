@@ -28,7 +28,6 @@ const pool = new Pool({
 // --- DB INIT ---
 const initDb = async () => {
     try {
-        // Ensure stats table exists
         await pool.query(`
             CREATE TABLE IF NOT EXISTS usage_stats (
                 id SERIAL PRIMARY KEY,

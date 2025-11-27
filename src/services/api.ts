@@ -1,3 +1,4 @@
+
 import type { User, Folder, ImageFile } from '../types';
 
 const API_BASE_URL = '/api';

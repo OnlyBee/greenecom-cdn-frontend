@@ -19,20 +19,19 @@ const PodPower: React.FC = () => {
   const [loadingStats, setLoadingStats] = useState(false);
 
   const fetchStats = useCallback(() => {
-    if (!isAdmin) return; // Chỉ Admin mới lấy stats
+    // Allow ALL users to see stats for debugging, or revert to isAdmin check later
     setLoadingStats(true);
     api.getStats()
       .then(data => { if (Array.isArray(data)) setStats(data); })
       .catch(console.warn)
       .finally(() => setLoadingStats(false));
-  }, [isAdmin]);
+  }, []);
 
   useEffect(() => {
     const existingKey = getApiKey();
     if (existingKey) {
       setApiKeyState(existingKey);
     } else {
-      // Nếu không có key, chỉ admin mới bị bắt nhập
       if (isAdmin) {
         setIsApiKeyModalOpen(true);
       }
@@ -46,26 +45,24 @@ const PodPower: React.FC = () => {
     setIsApiKeyModalOpen(false);
   };
   
-  // Khi API báo lỗi key, chỉ admin mới thấy modal nhập lại
   const handleApiError = useCallback(() => {
     if (isAdmin) {
         clearApiKey();
         setApiKeyState(null);
         setIsApiKeyModalOpen(true);
+    } else {
+        alert("API Key Error. Please contact an Administrator.");
     }
   }, [isAdmin]);
 
   const handleSelectFeature = (feat: Feature) => {
       setSelectedFeature(feat);
-      // Tải lại stats mỗi khi chuyển tab
       fetchStats();
   };
 
-  const shouldShowApiKeyModal = isApiKeyModalOpen && isAdmin;
-
   return (
     <div className="min-h-screen text-gray-100 font-sans relative pb-20">
-      {shouldShowApiKeyModal && (
+      {(isApiKeyModalOpen && isAdmin) && (
           <PodApiKeyModal
             isAdmin={isAdmin}
             isOpen={true}
@@ -74,9 +71,8 @@ const PodPower: React.FC = () => {
           />
       )}
 
-      {/* STATS SECTION (chỉ Admin thấy) */}
-      {isAdmin && (
-        <div className="bg-gray-800 rounded-xl shadow-lg p-4 mb-8 border border-gray-700">
+      {/* STATS SECTION - ALWAYS VISIBLE AT TOP */}
+      <div className="bg-gray-800 rounded-xl shadow-lg p-4 mb-8 border border-gray-700">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-white">📊 Team Usage Statistics</h3>
                 <button 
@@ -84,10 +80,10 @@ const PodPower: React.FC = () => {
                     disabled={loadingStats}
                     className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-gray-300 transition"
                 >
-                    {loadingStats ? 'Loading...' : 'Refresh'}
+                    {loadingStats ? 'Loading...' : 'Refresh Stats'}
                 </button>
             </div>
-            <div className="overflow-x-auto max-h-60">
+            <div className="overflow-x-auto max-h-60 custom-scrollbar">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-gray-900 text-gray-400 uppercase text-xs sticky top-0">
                         <tr>
@@ -112,7 +108,6 @@ const PodPower: React.FC = () => {
                 </table>
             </div>
         </div>
-      )}
 
       <div className="pb-8">
         <div className="text-center mb-8">

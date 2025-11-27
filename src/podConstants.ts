@@ -21,22 +21,19 @@ export const VARIATION_COLORS: Color[] = [
 ];
 
 export const FLAT_LAY_PROPS = [
-    "blue denim jeans",
-    "a small succulent plant in a white pot",
-    "a rustic dried tree branch",
-    "a beige knit scarf",
-    "a red plaid flannel scarf",
-    "white canvas sneakers",
-    "a cozy wool cardigan",
-    "a wide-brimmed fedora hat",
-    "stylish reading glasses",
-    "a classic wrist watch",
-    "a wrapped gift box with ribbon",
-    "a mason jar with flowers",
-    "a ceramic coffee mug",
-    "a fresh daisy flower",
-    "a red rose",
-    "dried pampas grass",
-    "a gold necklace",
-    "a wooden photo frame"
+    "jeans", 
+    "a flower pot", 
+    "a tree branch", 
+    "a plain scarf", 
+    "a plaid scarf", 
+    "sneakers", 
+    "a wool cardigan", 
+    "a hat", 
+    "glasses", 
+    "a watch", 
+    "a gift box", 
+    "a glass jar", 
+    "a cup", 
+    "a flower branch", 
+    "pampas grass"
 ];

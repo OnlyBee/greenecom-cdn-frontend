@@ -39,8 +39,8 @@ const generateImage = async (imagePart: any, prompt: string, aspectRatio: string
         },
     });
 
+    // Safe check for response structure
     const candidates = response.candidates;
-    // Fix TS2532: Use optional chaining to safely access content and parts
     if (candidates && candidates.length > 0 && candidates[0].content?.parts) {
         for (const part of candidates[0].content.parts) {
             if (part.inlineData) {
@@ -54,27 +54,24 @@ const generateImage = async (imagePart: any, prompt: string, aspectRatio: string
 
 const getRandomProps = (): string => {
     const shuffled = [...FLAT_LAY_PROPS].sort(() => 0.5 - Math.random());
-    const count = 3; // Force 3 items
+    const count = Math.floor(Math.random() * 2) + 2; // Select 2 to 3 items
     const selected = shuffled.slice(0, count);
-    if (selected.length === 0) return "flowers and jeans";
-    return selected.join(", ");
+    
+    if (selected.length === 0) return "";
+    if (selected.length === 1) return selected[0];
+    const last = selected.pop();
+    return `${selected.join(", ")} and ${last}`;
 };
 
 export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
   const imagePart = await fileToGenerativePart(file);
   
   const promises = selectedColors.map(async (color) => {
-    const prompt = `Task: Recolor the apparel.
-    Target Color: ${color.name} (${color.hex}).
-    Instructions: 
-    1. Identify the apparel item in the image.
-    2. Change ONLY the fabric color to exactly ${color.name}.
-    3. KEEP the original design/artwork 100% intact.
-    4. KEEP the original background and lighting.
-    5. High realism, 4k quality.`;
+    const prompt = `Analyze the apparel in the provided image. The design on the apparel must be preserved perfectly. The task is to change ONLY the color of the apparel itself to '${color.name}'. Do not alter the background, any other objects, or the design printed on the apparel. The output must be an image.`;
     
     try {
         const src = await generateImage(imagePart, prompt, "1:1");
+        // Track usage
         api.recordUsage('variation').catch(e => console.warn('Tracking failed', e));
         return { src, name: `${color.name}.png` };
     } catch (e) {
@@ -90,51 +87,49 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
     const imagePart = await fileToGenerativePart(file);
 
     const createMockupPromises = (apparelType: ApparelType | null): Promise<GeneratedImage>[] => {
-        const typeStr = apparelType || "T-shirt";
+        const basePrompt = `You are an expert product photographer. 
+        TASK: Extract the GRAPHIC DESIGN/ARTWORK from the source image and apply it to a BRAND NEW apparel mockup.
+        CRITICAL: 
+        1. Do NOT use the original background. Create a completely NEW environment.
+        2. Do NOT use the original person/model. Use a NEW model or NEW pose.
+        3. Keep the graphic design exactly as is (colors, details), but realistic lighting must apply to it.`;
+
+        const typeStr = apparelType || "apparel";
+        const apparelInstruction = `The item is a ${typeStr}.`;
         const randomProps = getRandomProps();
 
         // 1. Model Prompt
-        const modelPrompt = `
-        ROLE: Professional Fashion Photographer.
-        TASK: Create a LIFESTYLE MODEL MOCKUP.
-        INPUT: Use the graphic design from the source image.
+        const modelPrompt = `${basePrompt} ${apparelInstruction}
+        SCENE: A lifestyle fashion shot.
+        SUBJECT: Generate a composite image showing TWO angles of a model wearing this ${typeStr}.
+        - Figure A (Front): A model facing forward, clearly displaying the design on the FRONT.
+        - Figure B (Back): The SAME model standing turned around (back to camera) to show the BACK of the item.
+        COMPOSITION: 
+        - The two figures should stand close together, slightly overlapping (e.g., back-to-back or one slightly behind the other).
+        - Zoom in to frame them from mid-thigh up.
+        - FOCUS: The Graphic Design must be large, readable, and the center of attention.
+        - Lighting: Professional studio or natural outdoor lighting.`;
         
-        INSTRUCTIONS:
-        1. GENERATE A NEW IMAGE of a real human model wearing a ${typeStr}.
-        2. PLACE the original graphic design onto the chest of the ${typeStr}.
-        3. IGNORE the original background. Create a NEW blurred urban street or cozy cafe background.
-        4. VIEW: Front view, waist-up, close-up zoom on the apparel.
-        5. LIGHTING: Natural sunlight, soft shadows.
-        6. QUALITY: Photorealistic, 8k, highly detailed texture.
-        `;
-        
-        // 2. Flat-lay Prompt - Strong enforcement of props
-        const flatLayPrompt = `
-        ROLE: Expert Product Photographer.
-        TASK: Create a CREATIVE FLAT LAY COMPOSITION.
-        
-        MANDATORY ELEMENTS:
-        1. OBJECT: A folded ${typeStr} placed in the center.
-        2. DESIGN: Apply the source graphic design onto the ${typeStr} clearly.
-        3. BACKGROUND: A textured wooden table or marble surface.
-        4. PROPS (MUST INCLUDE): Scatter these around the shirt: ${randomProps}.
-        
-        COMPOSITION RULES:
-        - View: Top-down (Bird's eye view).
-        - Zoom: CLOSE-UP. The shirt should occupy 80% of the frame.
-        - Lighting: Soft studio lighting, realistic shadows.
-        - NO collage, NO split screen. Single cohesive image.
-        `;
+        // 2. Flat-lay Prompt
+        const flatLayPrompt = `${basePrompt} ${apparelInstruction}
+        SCENE: A professional flat-lay photography on a specific surface (e.g., wooden table, concrete, or marble).
+        SUBJECT: Arrange TWO ${typeStr}s on the surface.
+        - Item 1: Unfolded or neatly arranged showing the FRONT design.
+        - Item 2: Folded or laid next to Item 1, showing the BACK of the apparel.
+        COMPOSITION:
+        - Place them close together to fill the frame.
+        - Do not zoom out too far; crop tightly around the shirts so the Design is very clear and detailed.
+        DECORATION: Stylize the scene with ${randomProps} placed naturally around (but not covering the design).`;
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
 
         const modelPromise = generateImage(imagePart, modelPrompt, "1:1").then(src => {
             api.recordUsage('mockup').catch(console.warn);
-            return { src, name: `model${nameSuffix}.png` };
+            return { src, name: `model${nameSuffix}_double_sided.png` };
         });
         const flatLayPromise = generateImage(imagePart, flatLayPrompt, "1:1").then(src => {
             api.recordUsage('mockup').catch(console.warn);
-            return { src, name: `flatlay${nameSuffix}_with_props.png` };
+            return { src, name: `flatlay${nameSuffix}_double_sided.png` };
         });
 
         return [modelPromise, flatLayPromise];
