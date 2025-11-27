@@ -1,3 +1,4 @@
+
 import type { Color } from './podTypes';
 
 export const VARIATION_COLORS: Color[] = [

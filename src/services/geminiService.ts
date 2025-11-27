@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Modality } from "@google/genai";
 import type { GeneratedImage, Color, ApparelType } from "../podTypes";
 import { getApiKey } from '../utils/apiKey';
@@ -41,7 +42,6 @@ const generateImage = async (imagePart: any, prompt: string, aspectRatio: string
         },
     });
 
-    // FIX TS ERROR HERE: Optional Chaining
     const firstPart = response.candidates?.[0]?.content?.parts?.[0];
     if (firstPart && 'inlineData' in firstPart && firstPart.inlineData) {
         return `data:${firstPart.inlineData.mimeType};base64,${firstPart.inlineData.data}`;
@@ -52,7 +52,6 @@ const generateImage = async (imagePart: any, prompt: string, aspectRatio: string
 export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
   const imagePart = await fileToGenerativePart(file);
   
-  // TRACKING
   try { await api.recordUsage('variation'); } catch(e) {}
 
   const promises = selectedColors.map(async (color) => {
@@ -67,14 +66,12 @@ export const generateVariations = async (file: File, selectedColors: Color[]): P
 export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Promise<GeneratedImage[]> => {
     const imagePart = await fileToGenerativePart(file);
     
-    // TRACKING
     try { await api.recordUsage('mockup'); } catch(e) {}
 
     const createMockupPromises = (apparelType: ApparelType | null): Promise<GeneratedImage>[] => {
         const typeStr = apparelType || "apparel";
         const props = getRandomProps();
 
-        // STRONG PROMPT FOR FLATLAY
         const flatLayPrompt = `
         ROLE: Professional Product Photographer.
         TASK: Create a High-End Flatlay Mockup.
@@ -88,7 +85,6 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         3. Realistic shadows and lighting.
         `;
 
-        // STRONG PROMPT FOR MODEL
         const modelPrompt = `
         ROLE: Fashion Photographer.
         TASK: Create a Lifestyle Model Mockup.
