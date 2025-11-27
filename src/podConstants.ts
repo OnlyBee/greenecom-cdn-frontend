@@ -4,7 +4,7 @@ export const VARIATION_COLORS: Color[] = [
   { name: "Black", value: "BLACK", hex: "#000000" },
   { name: "White", value: "WHITE", hex: "#FFFFFF" },
   { name: "Sport Grey", value: "SPORT GREY", hex: "#a9a9a9" },
-  { name: "Sand", value: "SAND", hex: "#C2B280" }, // Updated hex based on common POD sand
+  { name: "Sand", value: "SAND", hex: "#C2B280" },
   { name: "Forest Green", value: "FOREST GREEN", hex: "#228B22" },
   { name: "Light Pink", value: "LIGHT PINK", hex: "#FFB6C1" },
   { name: "Navy", value: "NAVY", hex: "#000080" },
@@ -21,19 +21,22 @@ export const VARIATION_COLORS: Color[] = [
 ];
 
 export const FLAT_LAY_PROPS = [
-    "jeans",
-    "a flower pot",
-    "a tree branch",
-    "a plain scarf",
-    "a plaid scarf",
-    "sneakers",
-    "a wool cardigan",
-    "a hat",
-    "glasses",
-    "a watch",
-    "a gift box",
-    "a glass jar",
-    "a cup",
-    "a flower branch",
-    "pampas grass"
+    "blue denim jeans",
+    "a small succulent plant in a white pot",
+    "a rustic dried tree branch",
+    "a beige knit scarf",
+    "a red plaid flannel scarf",
+    "white canvas sneakers",
+    "a cozy wool cardigan",
+    "a wide-brimmed fedora hat",
+    "stylish reading glasses",
+    "a classic wrist watch",
+    "a wrapped gift box with ribbon",
+    "a mason jar with flowers",
+    "a ceramic coffee mug",
+    "a fresh daisy flower",
+    "a red rose",
+    "dried pampas grass",
+    "a gold necklace",
+    "a wooden photo frame"
 ];

@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import type { GeneratedImage } from '../types';
+import type { GeneratedImage } from '../podTypes';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
@@ -32,9 +31,8 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
         });
         await Promise.all(promises);
         const content = await zip.generateAsync({ type: "blob" });
-        saveAs(content, "pod_power_results.zip");
+        saveAs(content, "pod_results.zip");
     } catch (e) {
-        console.error("Zip failed", e);
         alert("Failed to zip images.");
     } finally {
         setIsZipping(false);
@@ -42,34 +40,40 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
   };
 
   return (
-    <div className="mt-12 w-full">
+    <div className="mt-12 w-full pb-10">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-white">Generated Images</h2>
+        <h2 className="text-2xl font-bold text-white">Generated Results</h2>
         <button
           onClick={handleDownloadAll}
           disabled={isZipping}
-          className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg flex items-center gap-2 shadow-lg transition-all"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 shadow-lg transition-all"
         >
-          <DownloadIcon /> {isZipping ? 'Zipping...' : 'Download All (.zip)'}
+          <DownloadIcon /> {isZipping ? 'Creating Zip...' : 'Download All (.zip)'}
         </button>
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {images.map((image, index) => (
-          <div key={index} className="bg-gray-800 rounded-xl overflow-hidden shadow-lg border border-gray-700 group relative">
-            <img src={image.src} alt={image.name} className="w-full h-auto object-contain" />
+          <div key={index} className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl border border-gray-700 flex flex-col">
+            <div 
+                className="relative cursor-pointer bg-gray-900 aspect-square"
+                onClick={() => setPreviewImage(image)}
+            >
+                <img src={image.src} alt={image.name} className="w-full h-full object-contain" />
+            </div>
             
-            <div className="bg-gray-900/90 p-3 flex justify-between items-center backdrop-blur-sm border-t border-gray-600">
+            {/* BUTTONS BAR - ALWAYS VISIBLE */}
+            <div className="bg-gray-900 p-4 flex justify-between items-center border-t border-gray-600">
                 <button 
                     onClick={() => setPreviewImage(image)}
-                    className="flex items-center gap-1 text-sm text-blue-300 hover:text-white transition-colors"
+                    className="flex-1 flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-l-lg border-r border-blue-700 transition-colors"
                 >
                     <EyeIcon /> Preview
                 </button>
                 <a
                     href={image.src}
                     download={image.name}
-                    className="flex items-center gap-1 text-sm bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded transition-colors"
+                    className="flex-1 flex justify-center items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-r-lg transition-colors"
                 >
                     <DownloadIcon /> Save
                 </a>
@@ -79,10 +83,10 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
       </div>
 
       {previewImage && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4" onClick={() => setPreviewImage(null)}>
-              <div className="relative max-w-full max-h-full">
-                  <img src={previewImage.src} alt="Preview" className="max-h-[90vh] max-w-[90vw] rounded shadow-2xl" />
-                  <button onClick={() => setPreviewImage(null)} className="absolute -top-10 right-0 text-white text-4xl">&times;</button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-md" onClick={() => setPreviewImage(null)}>
+              <div className="relative w-full h-full flex items-center justify-center">
+                  <img src={previewImage.src} alt="Preview" className="max-h-[90vh] max-w-[90vw] rounded-lg shadow-2xl object-contain" />
+                  <button onClick={() => setPreviewImage(null)} className="absolute top-4 right-4 text-white hover:text-red-500 text-5xl font-bold transition-colors">&times;</button>
               </div>
           </div>
       )}

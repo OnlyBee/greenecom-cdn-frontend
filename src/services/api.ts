@@ -5,6 +5,7 @@ const API_BASE_URL = '/api';
 const getToken = () => localStorage.getItem('greenecom_token');
 
 const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
+  // Cast to any to avoid TS7053 error when setting custom headers
   const headers: any = { ...options.headers };
   
   const token = getToken();
