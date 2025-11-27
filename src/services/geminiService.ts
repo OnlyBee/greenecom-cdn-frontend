@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import type { GeneratedImage, Color, ApparelType } from "../podTypes";
 import { getApiKey } from '../utils/apiKey';
@@ -62,7 +61,7 @@ const generateImage = async (imagePart: any, prompt: string, isCollage: boolean 
         
         // If no image found, check for text (error message from model)
         const textPart = parts.find(p => p.text);
-        if (textPart) {
+        if (textPart && textPart.text) {
             console.warn("Model returned text instead of image:", textPart.text);
             // Throw a more descriptive error if possible, but keep it user friendly
             throw new Error(`Model refused to generate image. Reason: ${textPart.text.substring(0, 50)}...`);
