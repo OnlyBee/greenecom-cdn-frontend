@@ -1,5 +1,5 @@
 
-import type { User, Folder, ImageFile } from '../types';
+import type { User, Folder, ImageFile, UsageStat } from '../types';
 
 const API_BASE_URL = '/api';
 
@@ -145,4 +145,12 @@ export const api = {
   deleteFolder: (folderId: string) => request<void>(`/folders/${folderId}`, {
     method: 'DELETE',
   }),
+
+  // Stats
+  trackUsage: (feature: string) => request<void>('/stats/track', {
+    method: 'POST',
+    body: JSON.stringify({ feature })
+  }),
+
+  getUsageStats: () => request<UsageStat[]>('/stats'),
 };

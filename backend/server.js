@@ -25,6 +25,23 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+// Init Stats Table
+const initDb = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usage_stats (
+        feature_name VARCHAR(50) PRIMARY KEY,
+        usage_count INT DEFAULT 0,
+        last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("Stats table initialized");
+  } catch (err) {
+    console.error("Error initializing DB:", err);
+  }
+};
+initDb();
+
 // --- S3 CONFIG (FIXED FOR SGP1) ---
 const spacesRegion = process.env.SPACES_REGION ? process.env.SPACES_REGION.trim() : 'sgp1';
 const spacesBucket = process.env.SPACES_BUCKET ? process.env.SPACES_BUCKET.trim() : 'greene';
@@ -465,6 +482,33 @@ app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, re
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });
   } finally { client.release(); }
+});
+
+// 6. STATS TRACKING (New)
+app.post(['/stats/track', '/api/stats/track'], authenticateToken, async (req, res) => {
+  const { feature } = req.body;
+  if (!feature) return res.status(400).json({ error: 'Feature name required' });
+  try {
+    const query = `
+      INSERT INTO usage_stats (feature_name, usage_count, last_used_at)
+      VALUES ($1, 1, NOW())
+      ON CONFLICT (feature_name)
+      DO UPDATE SET usage_count = usage_stats.usage_count + 1, last_used_at = NOW();
+    `;
+    await pool.query(query, [feature]);
+    res.status(200).json({ message: 'Tracked' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get(['/stats', '/api/stats'], authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM usage_stats ORDER BY usage_count DESC');
+    res.json(result.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));

@@ -4,6 +4,7 @@ import { PodImageUploader } from './PodImageUploader';
 import { PodImageGrid } from './PodImageGrid';
 import { PodSpinner } from './PodSpinner';
 import { generateVariations } from '../services/geminiService';
+import { api } from '../services/api';
 import { VARIATION_COLORS } from '../podConstants';
 import type { GeneratedImage, Color } from '../podTypes';
 
@@ -43,6 +44,10 @@ export const PodVariationGenerator: React.FC<VariationGeneratorProps> = ({ onApi
     try {
       const images = await generateVariations(selectedFile, selectedColors);
       setGeneratedImages(images);
+      
+      // Track usage
+      api.trackUsage('variation').catch(e => console.error('Tracking failed', e));
+
     } catch (err: any) {
       console.error(err);
       const rawMsg = err.message || err.toString();

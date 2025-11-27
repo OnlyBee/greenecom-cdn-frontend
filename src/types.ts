@@ -30,6 +30,7 @@ export type Feature = 'variation' | 'mockup';
 export interface GeneratedImage {
   src: string;
   name: string;
+  apparelType?: string; // Optional context about what generated it
 }
 
 export interface Color {
@@ -39,3 +40,9 @@ export interface Color {
 }
 
 export type ApparelType = 'T-shirt' | 'Hoodie' | 'Sweater';
+
+export interface UsageStat {
+  feature_name: string;
+  usage_count: number;
+  last_used_at: string;
+}

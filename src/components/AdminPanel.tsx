@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import type { User, Folder } from '../types';
+import React, { useState, useEffect } from 'react';
+import type { User, Folder, UsageStat } from '../types';
 import { api } from '../services/api';
 import Modal from './Modal';
 
@@ -13,6 +13,12 @@ interface AdminPanelProps {
 const TrashIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+);
+
+const ChartIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
     </svg>
 );
 
@@ -29,7 +35,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [stats, setStats] = useState<UsageStat[]>([]);
   
+  useEffect(() => {
+    // Fetch stats separately to avoid bloat in parent component
+    api.getUsageStats()
+      .then(setStats)
+      .catch(console.error);
+  }, []); // Run once on mount
+
   const handleCreateUser = async () => {
     if (!newUsername || !newPassword) {
       setError('Username and password are required.');
@@ -129,7 +144,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
 
   return (
     <div className="bg-gray-800 rounded-lg shadow-xl p-4">
-      <h2 className="text-xl font-bold mb-3 text-white">Admin Panel</h2>
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-xl font-bold text-white">Admin Panel</h2>
+        {/* Stats Summary */}
+        <div className="flex space-x-4 bg-gray-900/50 p-2 rounded-lg border border-gray-700">
+           {stats.length > 0 ? stats.map(stat => (
+               <div key={stat.feature_name} className="flex flex-col items-center px-2">
+                   <span className="text-[10px] uppercase text-gray-400 font-bold tracking-wider">{stat.feature_name}</span>
+                   <span className="text-lg font-bold text-purple-400">{stat.usage_count}</span>
+               </div>
+           )) : (
+               <span className="text-xs text-gray-500 px-2 italic">No usage stats</span>
+           )}
+        </div>
+      </div>
+      
       <div className="flex space-x-3 mb-4">
         <button onClick={() => setUserModalOpen(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm text-white font-semibold">Create User</button>
         <button onClick={() => setFolderModalOpen(true)} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded text-sm text-white font-semibold">Create Folder</button>
