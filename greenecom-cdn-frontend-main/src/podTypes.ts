@@ -1,3 +1,4 @@
+
 export type Feature = 'variation' | 'mockup';
 
 export interface GeneratedImage {

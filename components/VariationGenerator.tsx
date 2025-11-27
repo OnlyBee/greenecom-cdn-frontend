@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { ImageUploader } from './ImageUploader';
-import { PodImageGrid } from './PodImageGrid';
+import { ImageGrid } from './ImageGrid';
 import { Spinner } from './Spinner';
 import { generateVariations } from '../services/geminiService';
 import { VARIATION_COLORS } from '../constants';
@@ -139,7 +140,7 @@ export const VariationGenerator: React.FC<VariationGeneratorProps> = ({ onApiErr
 
       {error && <p className="mt-4 text-center text-red-400">{error}</p>}
 
-      <PodImageGrid images={generatedImages} />
+      <ImageGrid images={generatedImages} />
     </div>
   );
 };

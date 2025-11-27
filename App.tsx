@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import Header from './components/Header';
+import { Header } from './components/Header';
 import { FeatureSelector } from './components/FeatureSelector';
 import { VariationGenerator } from './components/VariationGenerator';
 import { MockupRemaker } from './components/MockupRemaker';
