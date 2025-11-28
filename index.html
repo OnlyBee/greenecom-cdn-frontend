@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -21,24 +22,30 @@
         },
       }
     </script>
-  <script type="importmap">
+<link rel="stylesheet" href="/index.css">
+<script type="importmap">
 {
   "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "vite": "https://aistudiocdn.com/vite@^7.2.4",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
     "path": "https://aistudiocdn.com/path@^0.12.7",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1"
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-gray-900 text-gray-100 antialiased">
-    <div id="root"></div>
+    <div id="root">
+        <!-- Fallback loading state -->
+        <div style="height: 100vh; display: flex; align-items: center; justify-content: center; background-color: #111827; color: white; font-family: sans-serif;">
+            Loading Application...
+        </div>
+    </div>
+    <!-- FIXED: Only load from src/index.tsx -->
     <script type="module" src="/src/index.tsx"></script>
-  <script type="module" src="/index.tsx"></script>
 </body>
 </html>
+    
