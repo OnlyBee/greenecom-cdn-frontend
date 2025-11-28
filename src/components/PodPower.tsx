@@ -20,14 +20,19 @@ const PodPower: React.FC = () => {
   const [showAdminKeyModal, setShowAdminKeyModal] = useState(false);
   const [showMemberContactModal, setShowMemberContactModal] = useState(false);
 
+  // Check if user is admin (case-insensitive check)
+  const isAdmin = user?.role?.toUpperCase() === Role.ADMIN;
+
   // 1. Fetch Key from Server on Mount
   const fetchSystemKey = useCallback(async () => {
+    if (!user) return;
     setLoadingKey(true);
     try {
         const key = await api.getSystemApiKey();
         setSystemKey(key);
+        
         // If user is Admin and no key exists, prompt to enter one
-        if (!key && user?.role === Role.ADMIN) {
+        if (!key && isAdmin) {
             setShowAdminKeyModal(true);
         }
     } catch (e) {
@@ -35,7 +40,7 @@ const PodPower: React.FC = () => {
     } finally {
         setLoadingKey(false);
     }
-  }, [user]);
+  }, [user, isAdmin]);
 
   useEffect(() => {
     fetchSystemKey();
@@ -57,16 +62,14 @@ const PodPower: React.FC = () => {
   // 3. Handle API Errors triggered by child components
   const handleApiError = useCallback(() => {
     // If the API call fails (403, 400, Quota), this is called.
-    if (user?.role === Role.ADMIN) {
+    if (isAdmin) {
         // Admin: Show modal to update key
         setShowAdminKeyModal(true);
     } else {
         // Member: Show "Contact Admin" message
         setShowMemberContactModal(true);
     }
-  }, [user]);
-
-  const isAdmin = user?.role === Role.ADMIN;
+  }, [isAdmin]);
 
   return (
     <div className="min-h-screen text-gray-100 font-sans relative">
@@ -106,10 +109,10 @@ const PodPower: React.FC = () => {
       <div className="pb-8 relative">
         {/* Admin floating button to update key manually */}
         {isAdmin && (
-            <div className="absolute top-0 right-0">
+            <div className="absolute top-0 right-0 z-10">
                 <button 
                     onClick={() => setShowAdminKeyModal(true)}
-                    className="text-xs bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-400 px-3 py-1 rounded-full flex items-center gap-1 transition-colors"
+                    className="text-xs bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-400 px-3 py-1 rounded-full flex items-center gap-1 transition-colors shadow-lg"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
                     Update API Key

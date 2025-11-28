@@ -1,4 +1,3 @@
-// src/contexts/AuthContext.tsx
 import React, {
   createContext,
   useState,
@@ -23,7 +22,6 @@ export type AuthContextType = {
   logout: () => void;
 };
 
-// 👈 QUAN TRỌNG: export AuthContext để những chỗ cũ import { AuthContext } không bị lỗi
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const TOKEN_KEY = 'greenecom_token';
@@ -32,7 +30,7 @@ const USER_KEY = 'greenecom_user';
 type DecodedToken = {
   id: string;
   role: Role;
-  username?: string; // Backend có gửi kèm username trong token
+  username?: string;
   exp: number;
   iat: number;
 };
@@ -52,38 +50,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Load lại từ localStorage khi F5
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
-    // Chúng ta không tin tưởng hoàn toàn vào storedUser vì nó có thể là format cũ (userId thay vì id)
-    // const storedUser = localStorage.getItem(USER_KEY); 
 
     if (storedToken) {
       const decoded = decodeToken(storedToken);
       
-      // Kiểm tra token còn hạn và có id hợp lệ không
       if (decoded && decoded.id && decoded.exp * 1000 > Date.now()) {
         setToken(storedToken);
         
-        // Tái tạo object User từ token để đảm bảo luôn có 'id'
-        // (Lấy username từ localStorage cũ nếu token không có, để hiển thị cho đẹp)
         let username = decoded.username || 'User';
         try {
              const oldUserStorage = JSON.parse(localStorage.getItem(USER_KEY) || '{}');
              if (oldUserStorage.username) username = oldUserStorage.username;
         } catch {}
 
+        // Normalize Role to Uppercase
+        const roleStr = (decoded.role || 'MEMBER').toString().toUpperCase();
+
         const restoredUser: User = {
             id: decoded.id,
-            role: decoded.role,
+            role: roleStr,
             username: username
         };
 
         setUser(restoredUser);
-        // Cập nhật lại localStorage cho đúng chuẩn mới
         localStorage.setItem(USER_KEY, JSON.stringify(restoredUser));
       } else {
-        // Token lỗi hoặc hết hạn -> Logout
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
         setToken(null);
@@ -116,10 +109,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error('Invalid token');
     }
 
+    // Normalize Role to Uppercase
+    const rawRole = decoded.role || data.role || 'MEMBER';
+    const normalizedRole = rawRole.toString().toUpperCase();
+
     const loggedUser: User = {
-      id: decoded.id, // Đã sửa: lấy đúng field id
+      id: decoded.id,
       username: data.username || username,
-      role: decoded.role || (data.role as Role),
+      role: normalizedRole,
     };
 
     setToken(tokenFromServer);

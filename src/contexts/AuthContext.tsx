@@ -65,9 +65,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
              if (oldUserStorage.username) username = oldUserStorage.username;
         } catch {}
 
+        // Normalize Role to Uppercase
+        const roleStr = (decoded.role || 'MEMBER').toString().toUpperCase();
+
         const restoredUser: User = {
             id: decoded.id,
-            role: decoded.role,
+            role: roleStr,
             username: username
         };
 
@@ -106,10 +109,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error('Invalid token');
     }
 
+    // Normalize Role to Uppercase
+    const rawRole = decoded.role || data.role || 'MEMBER';
+    const normalizedRole = rawRole.toString().toUpperCase();
+
     const loggedUser: User = {
       id: decoded.id,
       username: data.username || username,
-      role: decoded.role || (data.role as Role),
+      role: normalizedRole,
     };
 
     setToken(tokenFromServer);
