@@ -40,8 +40,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
   
   const fetchStats = () => {
     api.getUsageStats()
-      .then(setStats)
-      .catch(console.error);
+      .then(data => {
+          if (data) setStats(data);
+      })
+      .catch(err => console.error("Failed to fetch stats", err));
   };
 
   useEffect(() => {
@@ -147,7 +149,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
 
   return (
     <div className="bg-gray-800 rounded-lg shadow-xl p-4">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-gray-700 pb-4">
         <div>
             <h2 className="text-xl font-bold text-white">Admin Panel</h2>
             <div className="flex space-x-3 mt-2">
@@ -156,39 +158,47 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
             </div>
         </div>
 
-        {/* Stats Table */}
-        <div className="bg-gray-900 rounded-lg p-3 border border-gray-700 w-full md:w-auto min-w-[300px]">
-            <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wide">Usage Statistics</h3>
-                <button onClick={fetchStats} className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-800"><RefreshIcon/></button>
+        {/* --- USAGE STATISTICS DASHBOARD --- */}
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-700 w-full md:w-auto min-w-[320px] shadow-inner">
+            <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wide flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
+                    AI Usage Stats
+                </h3>
+                <button onClick={fetchStats} className="text-gray-400 hover:text-white p-1.5 rounded-full hover:bg-gray-800 transition-colors" title="Refresh Stats">
+                    <RefreshIcon/>
+                </button>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left text-gray-300">
-                    <thead className="text-xs text-gray-500 uppercase bg-gray-800">
+                    <thead className="text-xs text-gray-500 uppercase bg-gray-800/50">
                         <tr>
-                            <th className="px-3 py-1.5">Feature</th>
-                            <th className="px-3 py-1.5 text-right">Count</th>
-                            <th className="px-3 py-1.5 text-right">Last Used</th>
+                            <th className="px-3 py-2 rounded-l-md">Feature</th>
+                            <th className="px-3 py-2 text-right">Runs</th>
+                            <th className="px-3 py-2 text-right rounded-r-md">Last Used</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-800">
                         {stats.length > 0 ? stats.map(stat => (
-                            <tr key={stat.feature_name} className="border-b border-gray-800 hover:bg-gray-800/50">
+                            <tr key={stat.feature_name} className="hover:bg-gray-800/30 transition-colors">
                                 <td className="px-3 py-2 font-medium text-white capitalize">{stat.feature_name}</td>
                                 <td className="px-3 py-2 text-right font-bold text-green-400">{stat.usage_count}</td>
-                                <td className="px-3 py-2 text-right text-xs text-gray-500">
+                                <td className="px-3 py-2 text-right text-xs text-gray-500 font-mono">
                                     {new Date(stat.last_used_at).toLocaleDateString()}
                                 </td>
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={3} className="px-3 py-4 text-center text-gray-500 italic">No usage data yet</td>
+                                <td colSpan={3} className="px-3 py-4 text-center text-gray-500 italic text-xs">
+                                    No usage data yet. <br/> Generate some images!
+                                </td>
                             </tr>
                         )}
                     </tbody>
                 </table>
             </div>
         </div>
+        {/* ---------------------------------- */}
       </div>
       
       <div className="grid md:grid-cols-2 gap-4">
@@ -289,3 +299,4 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
 };
 
 export default AdminPanel;
+    

@@ -1,4 +1,3 @@
-
 import type { User, Folder, ImageFile, UsageStat } from '../types';
 
 const API_BASE_URL = '/api';
@@ -6,7 +5,6 @@ const API_BASE_URL = '/api';
 const getToken = () => localStorage.getItem('greenecom_token');
 
 const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
-  // Fix TypeScript error by casting to any to allow dynamic header assignment
   const headers: any = {
     ...options.headers,
   };
@@ -153,4 +151,15 @@ export const api = {
   }),
 
   getUsageStats: () => request<UsageStat[]>('/stats'),
+
+  // System Settings (API Keys)
+  getSystemApiKey: async () => {
+    const res = await request<{ key: string | null }>('/settings/gemini');
+    return res.key;
+  },
+
+  updateSystemApiKey: (key: string) => request<void>('/settings/gemini', {
+    method: 'PUT',
+    body: JSON.stringify({ key })
+  }),
 };
