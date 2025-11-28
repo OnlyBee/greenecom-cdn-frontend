@@ -131,10 +131,10 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
 
-        // Using 4:3 for Model to allow side-by-side room
-        const modelPromise = generateImage(imagePart, modelPrompt, "4:3").then(src => ({ src, name: `model${nameSuffix}_double.png` }));
-        // Using 4:3 for Flatlay to allow room for 2 items
-        const flatLayPromise = generateImage(imagePart, flatLayPrompt, "4:3").then(src => ({ src, name: `flatlay${nameSuffix}_double.png` }));
+        // Using 1:1 for Model to allow side-by-side room
+        const modelPromise = generateImage(imagePart, modelPrompt, "1:1").then(src => ({ src, name: `model${nameSuffix}_double.png` }));
+        // Using 1:1 for Flatlay to allow room for 2 items
+        const flatLayPromise = generateImage(imagePart, flatLayPrompt, "1:1").then(src => ({ src, name: `flatlay${nameSuffix}_double.png` }));
 
         return [modelPromise, flatLayPromise];
     };
