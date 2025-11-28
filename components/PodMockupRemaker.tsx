@@ -8,11 +8,11 @@ import type { GeneratedImage, ApparelType } from '../podTypes';
 
 const APPAREL_TYPES: ApparelType[] = ['T-shirt', 'Hoodie', 'Sweater'];
 
-interface MockupRemakerProps {
+interface PodMockupRemakerProps {
   onApiError: () => void;
 }
 
-export const MockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
+export const PodMockupRemaker: React.FC<PodMockupRemakerProps> = ({ onApiError }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -76,7 +76,7 @@ export const MockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
   };
 
   const generateButtonText = () => {
-    if (isLoading) return <Spinner />;
+    if (isLoading) return <PodSpinner />;
     const numTypes = selectedApparelTypes.length;
     if (numTypes > 0) {
       const totalMockups = numTypes * 2;
@@ -90,7 +90,7 @@ export const MockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
       <h2 className="text-2xl font-bold text-center text-white mb-2">Remake Professional Mockups</h2>
       <p className="text-center text-base-content mb-6">Generate two new mockups: one with a model and one flat-lay.</p>
       
-      <ImageUploader onFileSelect={handleFileSelect} previewUrl={previewUrl} />
+      <PodImageUploader onFileSelect={handleFileSelect} previewUrl={previewUrl} />
 
       {selectedFile && (
         <div className="mt-8 space-y-6">
@@ -148,7 +148,7 @@ export const MockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
 
       {error && <p className="mt-4 text-center text-red-400">{error}</p>}
 
-      <ImageGrid images={generatedImages} />
+      <PodImageGrid images={generatedImages} />
     </div>
   );
 };
