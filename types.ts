@@ -39,3 +39,9 @@ export interface Color {
 }
 
 export type ApparelType = 'T-shirt' | 'Hoodie' | 'Sweater';
+
+export interface UsageStat {
+  feature_name: string;
+  usage_count: number;
+  last_used_at: string;
+}

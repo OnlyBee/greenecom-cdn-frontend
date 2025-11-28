@@ -11,7 +11,7 @@ const {
   S3Client,
   DeleteObjectCommand,
   PutObjectCommand,
-  PutObjectAclCommand // Import thêm lệnh set ACL
+  PutObjectAclCommand 
 } = require('@aws-sdk/client-s3');
 const { URL } = require('url');
 
@@ -25,9 +25,10 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// Init Stats Table
+// Init DB Tables
 const initDb = async () => {
   try {
+    // Stats Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usage_stats (
         feature_name VARCHAR(50) PRIMARY KEY,
@@ -35,7 +36,16 @@ const initDb = async () => {
         last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log("Stats table initialized");
+    
+    // Settings Table (For API Keys)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        setting_key VARCHAR(50) PRIMARY KEY,
+        setting_value TEXT
+      );
+    `);
+    
+    console.log("DB Tables initialized");
   } catch (err) {
     console.error("Error initializing DB:", err);
   }
@@ -45,16 +55,11 @@ initDb();
 // --- S3 CONFIG (FIXED FOR SGP1) ---
 const spacesRegion = process.env.SPACES_REGION ? process.env.SPACES_REGION.trim() : 'sgp1';
 const spacesBucket = process.env.SPACES_BUCKET ? process.env.SPACES_BUCKET.trim() : 'greene';
-// Endpoint phải chính xác cho S3 Client
 const spacesEndpoint = process.env.SPACES_ENDPOINT 
   ? process.env.SPACES_ENDPOINT.trim() 
   : `https://${spacesRegion}.digitaloceanspaces.com`;
 
-// --- CDN CONFIG ---
-// Mặc định dùng link trực tiếp của Spaces để đảm bảo ảnh luôn hiển thị nếu CDN chưa cấu hình xong
 let cdnBaseUrl = `https://${spacesBucket}.${spacesRegion}.digitaloceanspaces.com`;
-
-// Nếu biến môi trường CDN_URL được set (ví dụ: https://cdn.greenecom.net), thì dùng nó
 if (process.env.CDN_URL) {
   cdnBaseUrl = process.env.CDN_URL.trim().replace(/\/+$/, '');
 }
@@ -125,7 +130,7 @@ app.post(['/login', '/api/login'], async (req, res) => {
     if (!isMatch) return res.status(401).json({ message: 'Invalid username or password' });
 
     const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, username: user.username, role: user.role }); // Trả thêm info để frontend đỡ phải decode
+    res.json({ token, username: user.username, role: user.role }); 
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -241,7 +246,6 @@ app.delete(['/folders/:id', '/api/folders/:id'], authenticateToken, isAdmin, asy
   } finally { client.release(); }
 });
 
-// ASSIGN/UNASSIGN
 app.post(['/folders/assign', '/api/folders/assign'], authenticateToken, isAdmin, async (req, res) => {
   const { userId, folderId } = req.body;
   try {
@@ -264,7 +268,6 @@ app.delete(['/folders/:folderId/users/:userId', '/api/folders/:folderId/users/:u
 // 4. View Data
 app.get(['/users/:userId/folders', '/api/users/:userId/folders'], authenticateToken, async (req, res) => {
   const { userId } = req.params;
-  // Fix logic check ID: convert both to string to prevent type mismatch (number vs string)
   if (req.user.role !== 'ADMIN' && String(req.user.id) !== String(userId)) {
       return res.status(403).send('Forbidden');
   }
@@ -293,9 +296,7 @@ app.get(['/folders/:folderId/images', '/api/folders/:folderId/images'], authenti
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 5. UPLOAD
-
-// Upload File (Multipart)
+// 5. UPLOAD (Multipart)
 app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   
@@ -312,7 +313,6 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
     
     const key = `${slug}/${Date.now()}-${safeFilename}`;
     
-    // Upload file
     await s3Client.send(new PutObjectCommand({
       Bucket: spacesBucket,
       Key: key,
@@ -321,16 +321,9 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
       ACL: 'public-read'
     }));
 
-    // Ép quyền public-read riêng (cho chắc chắn với mọi loại bucket)
     try {
-        await s3Client.send(new PutObjectAclCommand({
-            Bucket: spacesBucket,
-            Key: key,
-            ACL: 'public-read'
-        }));
-    } catch (aclErr) {
-        console.warn('Set ACL Failed:', aclErr.message);
-    }
+        await s3Client.send(new PutObjectAclCommand({ Bucket: spacesBucket, Key: key, ACL: 'public-read' }));
+    } catch (aclErr) {}
     
     const fileUrl = `${cdnBaseUrl}/${key}`;
     const result = await pool.query(
@@ -339,24 +332,19 @@ app.post(['/upload', '/api/upload'], authenticateToken, upload, async (req, res)
     );
     res.status(201).json(result.rows[0]);
   } catch (e) { 
-    console.error('Upload File Error:', e);
     res.status(500).json({ error: e.message, code: e.Code }); 
   }
 });
 
-// Upload URL (Download -> Re-upload)
 app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res) => {
   const { folderId, imageUrl } = req.body;
   if (!folderId || !imageUrl) return res.status(400).json({ error: 'Missing info' });
 
   try {
-    // 1. Lấy tên folder
     const folderRes = await pool.query('SELECT name FROM folders WHERE id = $1', [folderId]);
     if (folderRes.rows.length === 0) return res.status(404).json({ error: 'Folder not found' });
-    const folderName = folderRes.rows[0].name;
-    const folderSlug = slugify(folderName);
+    const folderSlug = slugify(folderRes.rows[0].name);
 
-    // 2. Tải ảnh (Timeout 10s)
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     
@@ -366,9 +354,7 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
     } catch (err) {
         if (err.name === 'AbortError') throw new Error('Timeout: Image took too long to download');
         throw err;
-    } finally {
-        clearTimeout(timeout);
-    }
+    } finally { clearTimeout(timeout); }
 
     if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
     
@@ -397,7 +383,6 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
 
     const key = `${folderSlug}/${Date.now()}-${fileName}`;
 
-    // 3. Upload lên Spaces
     await s3Client.send(new PutObjectCommand({
       Bucket: spacesBucket,
       Key: key,
@@ -406,18 +391,10 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
       ACL: 'public-read'
     }));
 
-     // Ép quyền public-read riêng
     try {
-        await s3Client.send(new PutObjectAclCommand({
-            Bucket: spacesBucket,
-            Key: key,
-            ACL: 'public-read'
-        }));
-    } catch (aclErr) {
-        console.warn('Set ACL Failed:', aclErr.message);
-    }
+        await s3Client.send(new PutObjectAclCommand({ Bucket: spacesBucket, Key: key, ACL: 'public-read' }));
+    } catch (aclErr) {}
 
-    // 4. Lưu link
     const fileUrl = `${cdnBaseUrl}/${key}`;
     const result = await pool.query(
       'INSERT INTO images (name, url, folder_id) VALUES ($1, $2, $3) RETURNING *',
@@ -426,40 +403,27 @@ app.post(['/upload/url', '/api/upload/url'], authenticateToken, async (req, res)
     res.status(201).json(result.rows[0]);
 
   } catch (e) { 
-    console.error('Upload URL Error:', e); 
     res.status(500).json({ error: e.message || 'Save URL failed' }); 
   }
 });
 
-// RENAME IMAGE (New)
 app.put(['/images/:id', '/api/images/:id'], authenticateToken, async (req, res) => {
     const { name } = req.body;
     const imageId = req.params.id;
     if (!name) return res.status(400).json({ error: 'Name is required' });
 
     try {
-        // Kiểm tra quyền (User phải được assign vào folder chứa ảnh này)
         if (req.user.role !== 'ADMIN') {
              const permCheck = await pool.query(`
-                SELECT 1 
-                FROM images i
-                JOIN folder_assignments fa ON i.folder_id = fa.folder_id
-                WHERE i.id = $1 AND fa.user_id = $2
+                SELECT 1 FROM images i JOIN folder_assignments fa ON i.folder_id = fa.folder_id WHERE i.id = $1 AND fa.user_id = $2
              `, [imageId, req.user.id]);
-             if (permCheck.rows.length === 0) {
-                 return res.status(403).json({ error: 'Access denied to rename this image' });
-             }
+             if (permCheck.rows.length === 0) return res.status(403).json({ error: 'Access denied' });
         }
 
-        const result = await pool.query(
-            'UPDATE images SET name = $1 WHERE id = $2 RETURNING *',
-            [name, imageId]
-        );
+        const result = await pool.query('UPDATE images SET name = $1 WHERE id = $2 RETURNING *', [name, imageId]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Image not found' });
         res.json(result.rows[0]);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, res) => {
@@ -469,7 +433,6 @@ app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, re
     const imgRes = await client.query('SELECT url FROM images WHERE id = $1', [req.params.id]);
     if (imgRes.rows.length > 0) {
       const u = new URL(imgRes.rows[0].url);
-      // Chỉ xoá trên Spaces nếu là host của mình
       if (u.hostname.includes('digitaloceanspaces.com') || u.hostname.includes('greenecom.net')) {
         const key = u.pathname.substring(1);
         await s3Client.send(new DeleteObjectCommand({ Bucket: spacesBucket, Key: key }));
@@ -484,7 +447,7 @@ app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, re
   } finally { client.release(); }
 });
 
-// 6. STATS TRACKING (New)
+// 6. STATS TRACKING
 app.post(['/stats/track', '/api/stats/track'], authenticateToken, async (req, res) => {
   const { feature } = req.body;
   if (!feature) return res.status(400).json({ error: 'Feature name required' });
@@ -497,18 +460,47 @@ app.post(['/stats/track', '/api/stats/track'], authenticateToken, async (req, re
     `;
     await pool.query(query, [feature]);
     res.status(200).json({ message: 'Tracked' });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get(['/stats', '/api/stats'], authenticateToken, isAdmin, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM usage_stats ORDER BY usage_count DESC');
     res.json(result.rows);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 7. SYSTEM SETTINGS (GEMINI KEY)
+// Get API Key (available to authenticated members so they can use the tool)
+app.get(['/settings/gemini', '/api/settings/gemini'], authenticateToken, async (req, res) => {
+    try {
+        const result = await pool.query("SELECT setting_value FROM system_settings WHERE setting_key = 'gemini_api_key'");
+        if (result.rows.length > 0) {
+            res.json({ key: result.rows[0].setting_value });
+        } else {
+            res.json({ key: null });
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Update API Key (Admin only)
+app.put(['/settings/gemini', '/api/settings/gemini'], authenticateToken, isAdmin, async (req, res) => {
+    const { key } = req.body;
+    if (!key) return res.status(400).json({ error: 'Key is required' });
+    try {
+        const query = `
+            INSERT INTO system_settings (setting_key, setting_value)
+            VALUES ('gemini_api_key', $1)
+            ON CONFLICT (setting_key)
+            DO UPDATE SET setting_value = $1
+        `;
+        await pool.query(query, [key]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));

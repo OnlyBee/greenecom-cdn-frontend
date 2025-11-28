@@ -1,7 +1,8 @@
+
 import { GoogleGenAI } from "@google/genai";
 import type { GeneratedImage, Color, ApparelType } from "../podTypes";
-import { getApiKey } from '../utils/apiKey';
 
+// Helper to encode file to base64
 const fileToGenerativePart = async (file: File) => {
   const base64EncodedDataPromise = new Promise<string>((resolve) => {
     const reader = new FileReader();
@@ -16,9 +17,8 @@ const fileToGenerativePart = async (file: File) => {
   };
 };
 
-const generateImage = async (imagePart: any, prompt: string, aspectRatio: string = "1:1"): Promise<string> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API key not found.");
+const generateImage = async (apiKey: string, imagePart: any, prompt: string, aspectRatio: string = "1:1"): Promise<string> => {
+    if (!apiKey) throw new Error("API key is missing.");
 
     const ai = new GoogleGenAI({ apiKey });
     
@@ -28,7 +28,7 @@ const generateImage = async (imagePart: any, prompt: string, aspectRatio: string
     Do not misspell, blur, or alter the design on the shirt.`;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-image-preview', // Update to Pro model
+        model: 'gemini-3-pro-image-preview',
         contents: {
             parts: [imagePart, { text: prompt }],
         },
@@ -55,13 +55,13 @@ const generateImage = async (imagePart: any, prompt: string, aspectRatio: string
     throw new Error("No image was generated.");
 };
 
-export const generateVariations = async (file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
+export const generateVariations = async (apiKey: string, file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
   const imagePart = await fileToGenerativePart(file);
   const promises = selectedColors.map(async (color) => {
     const prompt = `Professional product photography. Change the color of the T-shirt/apparel to '${color.name}'. 
     CRITICAL: Keep the printed graphic design and text EXACTLY the same as the original image. 
     Do not change the background. High resolution, realistic texture.`;
-    const src = await generateImage(imagePart, prompt, "1:1");
+    const src = await generateImage(apiKey, imagePart, prompt, "1:1");
     return { src, name: `${color.name}.png` };
   });
   return Promise.all(promises);
@@ -83,7 +83,7 @@ const getRandomProps = (): string => {
     return `${selected.join(", ")} and ${last}`;
 };
 
-export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Promise<GeneratedImage[]> => {
+export const remakeMockups = async (apiKey: string, file: File, apparelTypes: ApparelType[]): Promise<GeneratedImage[]> => {
     const imagePart = await fileToGenerativePart(file);
 
     const createMockupPromises = (apparelType: ApparelType | null): Promise<GeneratedImage>[] => {
@@ -97,8 +97,7 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         const apparelInstruction = `The item is a ${typeStr}.`;
         const randomProps = getRandomProps();
 
-        // 1. Model Prompt: SPLIT-SCREEN COMPOSITE
-        // Use 4:3 aspect ratio for side-by-side shots
+        // 1. Model Prompt: SPLIT-SCREEN COMPOSITE (4:3)
         const modelPrompt = `${basePrompt} ${apparelInstruction}
         SCENE: A high-end lifestyle fashion shot.
         GENERATE: A **Split-Screen Composite Image** (Left Half + Right Half).
@@ -113,7 +112,7 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         
         Background: Clean, neutral, boutique style.`;
         
-        // 2. Flat-lay Prompt: TWO ITEMS (Front & Back)
+        // 2. Flat-lay Prompt: TWO ITEMS (Front & Back) (4:3)
         const flatLayPrompt = `${basePrompt} ${apparelInstruction}
         SCENE: A professional flat-lay photography on a textured surface.
         GENERATE: An image containing **TWO SEPARATE ${typeStr}s** laid out together.
@@ -131,10 +130,9 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
 
-        // Using 1:1 for Model to allow side-by-side room
-        const modelPromise = generateImage(imagePart, modelPrompt, "1:1").then(src => ({ src, name: `model${nameSuffix}_double.png` }));
-        // Using 1:1 for Flatlay to allow room for 2 items
-        const flatLayPromise = generateImage(imagePart, flatLayPrompt, "1:1").then(src => ({ src, name: `flatlay${nameSuffix}_double.png` }));
+        // Pass API Key
+        const modelPromise = generateImage(apiKey, imagePart, modelPrompt, "1:1").then(src => ({ src, name: `model${nameSuffix}_double.png` }));
+        const flatLayPromise = generateImage(apiKey, imagePart, flatLayPrompt, "1:1").then(src => ({ src, name: `flatlay${nameSuffix}_double.png` }));
 
         return [modelPromise, flatLayPromise];
     };
