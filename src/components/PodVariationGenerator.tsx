@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { PodImageUploader } from './PodImageUploader';
 import { PodImageGrid } from './PodImageGrid';
@@ -9,10 +8,11 @@ import { VARIATION_COLORS } from '../podConstants';
 import type { GeneratedImage, Color } from '../podTypes';
 
 interface VariationGeneratorProps {
+  apiKey: string;
   onApiError: () => void;
 }
 
-export const PodVariationGenerator: React.FC<VariationGeneratorProps> = ({ onApiError }) => {
+export const PodVariationGenerator: React.FC<VariationGeneratorProps> = ({ apiKey, onApiError }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -38,11 +38,18 @@ export const PodVariationGenerator: React.FC<VariationGeneratorProps> = ({ onApi
   const handleGenerate = async () => {
     if (!selectedFile) return setError("Vui lòng chọn một ảnh trước.");
     if (selectedColors.length === 0) return setError("Vui lòng chọn ít nhất một màu để tạo.");
+    
+    // Check if key is empty before trying
+    if (!apiKey) {
+        onApiError();
+        return;
+    }
+
     setIsLoading(true);
     setError(null);
     setGeneratedImages([]);
     try {
-      const images = await generateVariations(selectedFile, selectedColors);
+      const images = await generateVariations(apiKey, selectedFile, selectedColors);
       setGeneratedImages(images);
       
       // Track usage
@@ -53,7 +60,7 @@ export const PodVariationGenerator: React.FC<VariationGeneratorProps> = ({ onApi
       const rawMsg = err.message || err.toString();
       if (rawMsg.includes("API key") || rawMsg.includes("400") || rawMsg.includes("403")) {
          onApiError();
-         setError("API Key lỗi. Vui lòng nhập lại.");
+         setError("API Key Error. Please contact Admin.");
       } else {
          setError(`Lỗi: ${rawMsg}`);
       }

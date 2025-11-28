@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { PodImageUploader } from './PodImageUploader';
 import { PodImageGrid } from './PodImageGrid';
@@ -10,10 +9,11 @@ import type { GeneratedImage, ApparelType } from '../podTypes';
 const APPAREL_TYPES: ApparelType[] = ['T-shirt', 'Hoodie', 'Sweater'];
 
 interface MockupRemakerProps {
+  apiKey: string;
   onApiError: () => void;
 }
 
-export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) => {
+export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ apiKey, onApiError }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -35,14 +35,20 @@ export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) =
 
   const handleGenerate = async () => {
     if (!selectedFile) return setError("Vui lòng chọn một ảnh trước.");
+    
+    if (!apiKey) {
+        onApiError();
+        return;
+    }
+
     setIsLoading(true);
     setError(null);
     setGeneratedImages([]);
     try {
-      const images = await remakeMockups(selectedFile, selectedApparelTypes);
+      // Pass apiKey
+      const images = await remakeMockups(apiKey, selectedFile, selectedApparelTypes);
       setGeneratedImages(images);
 
-      // Track usage
       api.trackUsage('mockup').catch(e => console.error('Tracking failed', e));
 
     } catch (err: any) {
@@ -50,7 +56,7 @@ export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ onApiError }) =
       const rawMsg = err.message || err.toString();
       if (rawMsg.includes("API key") || rawMsg.includes("400") || rawMsg.includes("403")) {
          onApiError();
-         setError("API Key lỗi.");
+         setError("API Key Error. Please contact Admin.");
       } else {
          setError(`Lỗi: ${rawMsg}`);
       }
