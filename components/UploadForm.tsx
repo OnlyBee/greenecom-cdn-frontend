@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { api } from '../services/api';
 
@@ -40,7 +39,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadS
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Generate previews when files change
   useEffect(() => {
     if (files.length > 0) {
         const urls = files.map(file => URL.createObjectURL(file));
@@ -55,7 +53,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadS
     }
   }, [files, urlInput]);
 
-  // Handle Drag Events
   const handleDrag = (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -81,15 +78,12 @@ const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadS
       }
   };
 
-  // Handle Paste (Ctrl+V)
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
-    // If typing in URL input, don't intercept paste
     if (isFocusedOnInput(e)) return;
 
     const items = e.clipboardData.items;
     const pastedFiles: File[] = [];
     
-    // 1. Check for Files (Image)
     for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image') !== -1) {
             const blob = items[i].getAsFile();
@@ -108,7 +102,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadS
         return;
     }
 
-    // 2. Check for Text (URL)
     const pastedText = e.clipboardData.getData('text');
     if (pastedText && pastedText.match(/^https?:\/\/.+/)) {
         setFiles([]);
@@ -123,7 +116,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadS
       setUrlInput('');
       setError(null);
     }
-    // Reset input so same file can be selected again if needed
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -152,7 +144,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadS
 
     try {
         if (files.length > 0) {
-            // Upload multiple files one by one (or parallel)
             let successCount = 0;
             for (let i = 0; i < files.length; i++) {
                 setProgress(`Uploading ${i + 1}/${files.length}...`);
@@ -161,7 +152,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadS
                     successCount++;
                 } catch (err) {
                     console.error(`Failed to upload ${files[i].name}`, err);
-                    // Continue uploading others
                 }
             }
             
@@ -207,109 +197,51 @@ const UploadForm: React.FC<UploadFormProps> = ({ folderId, folderName, onUploadS
         tabIndex={0} 
     >
       <div className="flex flex-col items-center space-y-4">
-        
-        {/* HEADER / INPUTS */}
         {files.length === 0 && !urlInput && (
             <div className="text-center space-y-2">
-                <p className="text-gray-300 font-medium pointer-events-none">
-                    Drag & Drop files here, Paste (Ctrl+V)
-                </p>
+                <p className="text-gray-300 font-medium pointer-events-none">Drag & Drop files here, Paste (Ctrl+V)</p>
                 <div className="flex items-center justify-center space-x-4">
                     <label className="cursor-pointer bg-gray-600 hover:bg-gray-500 text-white text-sm px-4 py-2 rounded-md transition">
                         Select Files
-                        <input 
-                            ref={fileInputRef}
-                            type="file" 
-                            className="hidden" 
-                            accept="image/*"
-                            multiple // Enable multiple
-                            onChange={handleFileSelect}
-                        />
+                        <input ref={fileInputRef} type="file" className="hidden" accept="image/*" multiple onChange={handleFileSelect} />
                     </label>
                     <span className="text-gray-400 text-sm">- or -</span>
-                    <input 
-                        type="text"
-                        placeholder="Paste image URL..."
-                        className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm text-white w-64 focus:ring-2 focus:ring-green-500 outline-none"
-                        value={urlInput}
-                        onChange={(e) => {
-                            setUrlInput(e.target.value);
-                            if(e.target.value) setFiles([]);
-                        }}
-                    />
+                    <input type="text" placeholder="Paste image URL..." className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm text-white w-64 focus:ring-2 focus:ring-green-500 outline-none" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); if(e.target.value) setFiles([]); }} />
                 </div>
             </div>
         )}
 
-        {/* PREVIEW AREA (GRID) */}
         {previewUrls.length > 0 && (
             <div className="w-full">
                 <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm text-gray-400">
-                        {files.length > 0 ? `${files.length} file(s) selected` : 'External URL'}
-                    </h4>
+                    <h4 className="text-sm text-gray-400">{files.length > 0 ? `${files.length} file(s) selected` : 'External URL'}</h4>
                     <button onClick={handleClear} className="text-xs text-red-400 hover:text-red-300">Clear All</button>
                 </div>
-
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 max-h-60 overflow-y-auto custom-scrollbar">
                     {previewUrls.map((url, idx) => (
                         <div key={idx} className="relative group bg-gray-800 rounded-md border border-gray-600 aspect-square">
-                            <img 
-                                src={url} 
-                                alt="Preview" 
-                                className="w-full h-full object-cover rounded-md"
-                            />
+                            <img src={url} alt="Preview" className="w-full h-full object-cover rounded-md" />
                             {files.length > 0 && (
-                                <button 
-                                    onClick={() => handleRemoveFile(idx)}
-                                    className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <XIcon />
-                                </button>
+                                <button onClick={() => handleRemoveFile(idx)} className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"><XIcon /></button>
                             )}
                         </div>
                     ))}
-                    {/* Add more button */}
                     {files.length > 0 && (
                          <label className="cursor-pointer flex flex-col items-center justify-center bg-gray-800/50 border-2 border-dashed border-gray-600 hover:border-gray-400 rounded-md aspect-square transition">
                             <span className="text-2xl text-gray-400">+</span>
-                            <input 
-                                type="file" 
-                                className="hidden" 
-                                accept="image/*"
-                                multiple
-                                onChange={handleFileSelect}
-                            />
+                            <input type="file" className="hidden" accept="image/*" multiple onChange={handleFileSelect} />
                         </label>
                     )}
                 </div>
             </div>
         )}
 
-        {/* ACTION BUTTONS */}
         <div className="w-full flex flex-col items-center justify-center pt-2 space-y-2">
              {loading && <span className="text-sm text-blue-300 animate-pulse">{progress}</span>}
-             
-             <button 
-                onClick={handleSubmit} 
-                disabled={loading || previewUrls.length === 0} 
-                className={`
-                    flex items-center px-6 py-2 rounded-md font-semibold text-white transition-all
-                    ${loading || previewUrls.length === 0 ? 'bg-gray-600 opacity-50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-green-500/30'}
-                `}
-            >
-                {loading ? (
-                    <span>Processing...</span>
-                ) : (
-                    <>
-                        {files.length > 0 ? <UploadIcon /> : <LinkIcon />}
-                        {files.length > 0 ? `Upload ${files.length} Files` : 'Save URL'}
-                    </>
-                )}
+             <button onClick={handleSubmit} disabled={loading || previewUrls.length === 0} className={`flex items-center px-6 py-2 rounded-md font-semibold text-white transition-all ${loading || previewUrls.length === 0 ? 'bg-gray-600 opacity-50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-green-500/30'}`}>
+                {loading ? <span>Processing...</span> : <>{files.length > 0 ? <UploadIcon /> : <LinkIcon />}{files.length > 0 ? `Upload ${files.length} Files` : 'Save URL'}</>}
             </button>
         </div>
-
-        {/* MESSAGES */}
         {error && <p className="text-red-400 text-sm bg-red-900/20 px-3 py-1 rounded">{error}</p>}
         {success && <p className="text-green-400 text-sm bg-green-900/20 px-3 py-1 rounded">{success}</p>}
       </div>

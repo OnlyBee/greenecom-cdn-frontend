@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { User, Folder, UsageStat } from '../types';
 import { api } from '../services/api';
@@ -299,4 +298,3 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
 };
 
 export default AdminPanel;
-    

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { api } from '../services/api';
 import Modal from './Modal';
@@ -34,9 +33,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
     try {
       await api.changePassword(currentPassword, newPassword);
       setSuccess('Password changed successfully!');
-      setTimeout(() => {
-        handleClose();
-      }, 1500);
+      setTimeout(() => { handleClose(); }, 1500);
     } catch (err: any) {
       setError(err.message || 'Failed to change password.');
     } finally {
@@ -57,41 +54,14 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Change Your Password">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="password"
-          placeholder="Current Password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          required
-          className="w-full bg-gray-700 p-2 rounded text-white placeholder-gray-400"
-        />
-        <input
-          type="password"
-          placeholder="New Password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          required
-          className="w-full bg-gray-700 p-2 rounded text-white placeholder-gray-400"
-        />
-        <input
-          type="password"
-          placeholder="Confirm New Password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-          className="w-full bg-gray-700 p-2 rounded text-white placeholder-gray-400"
-        />
-        
+        <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required className="w-full bg-gray-700 p-2 rounded text-white placeholder-gray-400" />
+        <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className="w-full bg-gray-700 p-2 rounded text-white placeholder-gray-400" />
+        <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className="w-full bg-gray-700 p-2 rounded text-white placeholder-gray-400" />
         {error && <p className="text-red-400 text-sm">{error}</p>}
         {success && <p className="text-green-400 text-sm">{success}</p>}
-
         <div className="flex justify-end space-x-4 pt-2">
-            <button type="button" onClick={handleClose} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded font-semibold">
-                Cancel
-            </button>
-            <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:bg-blue-800 font-semibold">
-                {loading ? 'Saving...' : 'Save Changes'}
-            </button>
+            <button type="button" onClick={handleClose} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded font-semibold">Cancel</button>
+            <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:bg-blue-800 font-semibold">{loading ? 'Saving...' : 'Save Changes'}</button>
         </div>
       </form>
     </Modal>

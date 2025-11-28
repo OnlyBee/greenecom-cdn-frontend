@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { ImageFile } from '../types';
 
@@ -100,66 +99,29 @@ const ImageCard: React.FC<{
 
     return (
         <div className="group bg-gray-700 rounded-lg overflow-hidden shadow-lg transition-transform transform hover:scale-105 relative">
-            <img 
-                src={image.displayUrl} 
-                alt={image.name} 
-                className="w-full h-48 object-cover cursor-pointer"
-                onClick={() => onPreview(image)}
-            />
+            <img src={image.displayUrl} alt={image.name} className="w-full h-48 object-cover cursor-pointer" onClick={() => onPreview(image)} />
             
-            {/* Actions Overlay (Top Right) */}
             <div className="absolute top-2 right-2 flex space-x-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                 <button 
-                    onClick={() => onPreview(image)}
-                    aria-label={`Preview image ${image.name}`}
-                    title="Preview"
-                    className="p-1.5 bg-gray-800/80 text-white rounded-full shadow hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                >
-                    <EyeIcon />
-                </button>
-                <button 
-                    onClick={handleDelete}
-                    aria-label={`Delete image ${image.name}`}
-                    title="Delete"
-                    className="p-1.5 bg-red-600 text-white rounded-full shadow hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                    <TrashIcon />
-                </button>
+                 <button onClick={() => onPreview(image)} className="p-1.5 bg-gray-800/80 text-white rounded-full shadow hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500"><EyeIcon /></button>
+                <button onClick={handleDelete} className="p-1.5 bg-red-600 text-white rounded-full shadow hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"><TrashIcon /></button>
             </div>
 
             <div className="p-4">
                 {isEditing ? (
                     <div className="flex items-center space-x-2 mb-2">
-                        <input 
-                            type="text" 
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            className="w-full bg-gray-600 text-white text-sm rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"
-                            autoFocus
-                        />
+                        <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={handleKeyDown} className="w-full bg-gray-600 text-white text-sm rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500" autoFocus />
                         <button onClick={handleSaveEdit} className="text-green-400 hover:text-green-300"><SaveIcon/></button>
                         <button onClick={handleCancelEdit} className="text-red-400 hover:text-red-300"><CancelIcon/></button>
                     </div>
                 ) : (
                     <div className="flex justify-between items-start mb-2 group/name">
                         <p className="text-sm text-gray-300 truncate flex-grow mr-2" title={image.name}>{image.name}</p>
-                        <button 
-                            onClick={handleStartEdit}
-                            aria-label="Rename"
-                            title="Rename"
-                            className="text-gray-500 hover:text-blue-400 opacity-0 group-hover:opacity-100 group-hover/name:opacity-100 transition-opacity"
-                        >
-                            <PencilIcon />
-                        </button>
+                        <button onClick={handleStartEdit} className="text-gray-500 hover:text-blue-400 opacity-0 group-hover:opacity-100 group-hover/name:opacity-100 transition-opacity"><PencilIcon /></button>
                     </div>
                 )}
-                
                 <div className="flex items-center bg-gray-800 rounded-md p-2">
                     <input type="text" readOnly value={image.url} className="bg-transparent text-xs text-gray-400 w-full focus:outline-none"/>
-                    <button onClick={handleCopy} className={`ml-2 p-1 rounded-md transition-colors ${copied ? 'bg-green-500 text-white' : 'bg-gray-600 text-gray-300 hover:bg-green-600'}`}>
-                        {copied ? <CheckIcon /> : <CopyIcon />}
-                    </button>
+                    <button onClick={handleCopy} className={`ml-2 p-1 rounded-md transition-colors ${copied ? 'bg-green-500 text-white' : 'bg-gray-600 text-gray-300 hover:bg-green-600'}`}>{copied ? <CheckIcon /> : <CopyIcon />}</button>
                 </div>
             </div>
         </div>
@@ -168,29 +130,14 @@ const ImageCard: React.FC<{
 
 const ImagePreviewModal: React.FC<{ image: ImageFile | null; onClose: () => void }> = ({ image, onClose }) => {
     if (!image) return null;
-
     return (
-        <div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
-            onClick={onClose}
-        >
-            <button 
-                onClick={onClose}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4" onClick={onClose}>
+            <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
             <div className="relative max-w-full max-h-full" onClick={e => e.stopPropagation()}>
-                <img 
-                    src={image.displayUrl} 
-                    alt={image.name} 
-                    className="max-w-full max-h-[90vh] object-contain rounded shadow-2xl"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-2 text-center text-white text-sm">
-                    {image.name}
-                </div>
+                <img src={image.displayUrl} alt={image.name} className="max-w-full max-h-[90vh] object-contain rounded shadow-2xl" />
+                <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-2 text-center text-white text-sm">{image.name}</div>
             </div>
         </div>
     );
@@ -198,28 +145,15 @@ const ImagePreviewModal: React.FC<{ image: ImageFile | null; onClose: () => void
 
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onDelete, onRename }) => {
   const [previewImage, setPreviewImage] = useState<ImageFile | null>(null);
-
-  if (images.length === 0) {
-    return <p className="text-gray-400 text-center py-8">No images in this folder yet. Upload one!</p>;
-  }
-
+  if (images.length === 0) return <p className="text-gray-400 text-center py-8">No images in this folder yet. Upload one!</p>;
   return (
     <>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
         {images.map((image) => (
-            <ImageCard 
-                key={image.id} 
-                image={image} 
-                onDelete={onDelete} 
-                onRename={onRename}
-                onPreview={setPreviewImage}
-            />
+            <ImageCard key={image.id} image={image} onDelete={onDelete} onRename={onRename} onPreview={setPreviewImage} />
         ))}
         </div>
-        <ImagePreviewModal 
-            image={previewImage} 
-            onClose={() => setPreviewImage(null)} 
-        />
+        <ImagePreviewModal image={previewImage} onClose={() => setPreviewImage(null)} />
     </>
   );
 };

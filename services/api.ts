@@ -1,16 +1,14 @@
-
-
 import type { User, Folder, ImageFile, UsageStat } from '../types';
 
 const API_BASE_URL = '/api';
 
-// --- Helper Functions ---
 const getToken = () => localStorage.getItem('greenecom_token');
 
 const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
-  const headers: HeadersInit = {
+  const headers: any = {
     ...options.headers,
   };
+  
   const token = getToken();
   if (token && !(options.body instanceof FormData)) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -19,7 +17,6 @@ const request = async <T>(url: string, options: RequestInit = {}): Promise<T> =>
     headers['Content-Type'] = 'application/json';
   }
 
-  // Ensure we don't double slash if url starts with /
   const endpoint = url.startsWith('/') ? url : `/${url}`;
   
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -31,13 +28,12 @@ const request = async <T>(url: string, options: RequestInit = {}): Promise<T> =>
     let errorMsg = `HTTP error! status: ${response.status}`;
     try {
         const errorData = await response.json();
-        // Prioritize error message from backend
         errorMsg = errorData.error || errorData.message || errorData.code || errorMsg;
-    } catch (e) { /* Ignore parsing error */ }
+    } catch (e) { }
     throw new Error(errorMsg);
   }
   
-  if (response.status === 204) { // No Content
+  if (response.status === 204) {
       return null as T;
   }
 
@@ -53,7 +49,6 @@ const slugify = (text: string) => {
         .replace(/-+$/, '');
 }
 
-// --- API Functions ---
 export const api = {
   async login(username: string, password: string): Promise<User> {
     const response = await fetch(`${API_BASE_URL}/login`, {
@@ -71,18 +66,15 @@ export const api = {
   getFoldersForUser: (userId: string) => request<Folder[]>(`/users/${userId}/folders`),
   getImagesInFolder: (folderId: string) => request<ImageFile[]>(`/folders/${folderId}/images`),
 
-  // 1. Upload File
   async uploadImage(file: File, folderId: string, folderName: string): Promise<void> {
     const folderSlug = slugify(folderName);
     const formData = new FormData();
-    
-    // IMPORTANT: Append text fields BEFORE the file.
     formData.append('folderId', folderId);
     formData.append('folderSlug', folderSlug);
     formData.append('image', file);
     
     const token = getToken();
-    const headers: HeadersInit = {};
+    const headers: any = {};
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
     }
@@ -104,7 +96,6 @@ export const api = {
     }
   },
 
-  // 2. Upload via URL (New)
   async uploadImageUrl(imageUrl: string, folderId: string): Promise<void> {
       return request<void>('/upload/url', {
           method: 'POST',
@@ -112,7 +103,6 @@ export const api = {
       });
   },
 
-  // 3. Rename Image
   renameImage: (imageId: string, newName: string) => request<ImageFile>(`/images/${imageId}`, {
       method: 'PUT',
       body: JSON.stringify({ name: newName })

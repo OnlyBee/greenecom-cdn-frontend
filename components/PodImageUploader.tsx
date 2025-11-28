@@ -32,15 +32,7 @@ export const PodImageUploader: React.FC<ImageUploaderProps> = ({ onFileSelect, p
 
   return (
     <div className="w-full max-w-xl mx-auto">
-      <label
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-        className={`relative flex items-center justify-center w-full h-80 rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer ${
-          isDragging ? 'border-purple-500 bg-gray-700' : 'border-gray-600 bg-gray-800 hover:border-purple-400'
-        }`}
-      >
+      <label onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop} className={`relative flex items-center justify-center w-full h-80 rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer ${isDragging ? 'border-purple-500 bg-gray-700' : 'border-gray-600 bg-gray-800 hover:border-purple-400'}`}>
         {previewUrl ? (
             <img src={previewUrl} alt="Preview" className="max-h-full max-w-full object-contain rounded-lg" />
         ) : (

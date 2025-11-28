@@ -3,6 +3,7 @@ export type Feature = 'variation' | 'mockup';
 export interface GeneratedImage {
   src: string;
   name: string;
+  apparelType?: string;
 }
 
 export interface Color {

@@ -1,4 +1,3 @@
-// src/components/Login.tsx
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -18,8 +17,6 @@ const Login: React.FC = () => {
 
     try {
       await login(username, password);
-      // Nếu login thành công, AuthContext sẽ set user + token,
-      // App.tsx sẽ tự render Dashboard.
     } catch (err: any) {
       setError(err?.message || 'Invalid username or password.');
     } finally {
@@ -38,43 +35,25 @@ const Login: React.FC = () => {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Username */}
           <div>
-            <label
-              htmlFor="username"
-              className="block text-sm font-medium text-gray-300"
-            >
-              Username
-            </label>
+            <label className="block text-sm font-medium text-gray-300">Username</label>
             <input
-              id="username"
-              name="username"
               type="text"
-              autoComplete="username"
               required
-              className="mt-1 block w-full rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="mt-1 block w-full rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-sm text-gray-100 focus:ring-2 focus:ring-emerald-500"
               placeholder="admin"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
           </div>
 
-          {/* Password + eye */}
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-300"
-            >
-              Password
-            </label>
+            <label className="block text-sm font-medium text-gray-300">Password</label>
             <div className="mt-1 relative">
               <input
-                id="password"
-                name="password"
                 type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
                 required
-                className="block w-full rounded-md border border-gray-600 bg-gray-900 px-3 py-2 pr-10 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="block w-full rounded-md border border-gray-600 bg-gray-900 px-3 py-2 pr-10 text-sm text-gray-100 focus:ring-2 focus:ring-emerald-500"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -89,19 +68,13 @@ const Login: React.FC = () => {
             </div>
           </div>
 
-          {/* Error */}
-          {error && (
-            <p className="text-sm text-red-400">
-              {error}
-            </p>
-          )}
+          {error && <p className="text-sm text-red-400">{error}</p>}
 
-          {/* Submit */}
           <div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center rounded-md bg-emerald-500 py-2 px-4 text-sm font-semibold text-white hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-60"
+              className="w-full flex justify-center items-center rounded-md bg-emerald-500 py-2 px-4 text-sm font-semibold text-white hover:bg-emerald-600 focus:outline-none disabled:opacity-60"
             >
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
@@ -112,5 +85,4 @@ const Login: React.FC = () => {
   );
 };
 
-// 👈 QUAN TRỌNG: default export
 export default Login;
