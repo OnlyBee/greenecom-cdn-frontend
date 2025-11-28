@@ -60,7 +60,7 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
         <h2 className="text-2xl font-bold text-white">Generated Images</h2>
         <button
           onClick={handleDownloadAll}
-          className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md"
+          className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
           <DownloadIcon />
           <span>Download All ({images.length})</span>
@@ -70,11 +70,11 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
         {images.map((image, index) => (
           <div key={index} className="group relative rounded-lg overflow-hidden shadow-lg bg-gray-800 aspect-square border border-gray-700">
             <img src={image.src} alt={`Generated mockup: ${image.name}`} className="w-full h-full object-contain" />
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-all duration-300 flex items-center justify-center gap-4">
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4">
               <button
                 onClick={() => setPreviewImage(image)}
                 title="Preview"
-                className="opacity-0 group-hover:opacity-100 transform group-hover:scale-100 scale-90 transition-all duration-300 bg-white text-gray-800 p-3 rounded-full shadow-lg hover:bg-gray-100"
+                className="bg-white text-gray-800 p-3 rounded-full shadow-lg hover:bg-gray-100 transform hover:scale-110 transition-transform"
               >
                  <PreviewIcon />
               </button>
@@ -82,7 +82,7 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
                 href={image.src}
                 download={image.name}
                 title="Download"
-                className="opacity-0 group-hover:opacity-100 transform group-hover:scale-100 scale-90 transition-all duration-300 bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-500"
+                className="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-500 transform hover:scale-110 transition-transform"
               >
                 <DownloadIcon />
               </a>
@@ -94,11 +94,11 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
       {/* Lightbox / Preview Modal */}
       {previewImage && (
           <div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-4 transition-opacity duration-300"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 transition-opacity duration-300 backdrop-blur-sm"
             onClick={() => setPreviewImage(null)}
           >
               <button 
-                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-50 bg-black/50 rounded-full p-1"
+                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-50 bg-black/50 rounded-full p-2"
                 onClick={(e) => {
                     e.stopPropagation();
                     setPreviewImage(null);
@@ -107,15 +107,15 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
                   <CloseIcon />
               </button>
               <div 
-                className="relative max-w-[95vw] max-h-[95vh] overflow-hidden rounded-lg shadow-2xl"
+                className="relative max-w-full max-h-full overflow-hidden rounded-lg shadow-2xl flex flex-col items-center"
                 onClick={(e) => e.stopPropagation()}
               >
                   <img 
                     src={previewImage.src} 
                     alt={previewImage.name} 
-                    className="max-w-full max-h-[90vh] object-contain" 
+                    className="max-w-full max-h-[85vh] object-contain" 
                   />
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-center backdrop-blur-sm">
+                  <div className="mt-4 text-white text-lg font-medium px-4 py-2 bg-black/60 rounded-full">
                       {previewImage.name}
                   </div>
               </div>

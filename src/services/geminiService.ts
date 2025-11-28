@@ -28,7 +28,7 @@ const generateImage = async (imagePart: any, prompt: string, aspectRatio: string
     Do not misspell, blur, or alter the design on the shirt.`;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-image-preview', // Using Pro model for better adherence to "2 items" instructions
+        model: 'gemini-3-pro-image-preview', // Update to Pro model
         contents: {
             parts: [imagePart, { text: prompt }],
         },
@@ -114,7 +114,6 @@ export const remakeMockups = async (file: File, apparelTypes: ApparelType[]): Pr
         Background: Clean, neutral, boutique style.`;
         
         // 2. Flat-lay Prompt: TWO ITEMS (Front & Back)
-        // Stronger instruction for "Two Items"
         const flatLayPrompt = `${basePrompt} ${apparelInstruction}
         SCENE: A professional flat-lay photography on a textured surface.
         GENERATE: An image containing **TWO SEPARATE ${typeStr}s** laid out together.
