@@ -51,31 +51,33 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      }, index * 250); 
+      }, index * 300); // 300ms delay to prevent blocking
     });
   };
 
   return (
-    <div className="mt-12">
+    <div className="mt-12 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-center items-center text-center gap-4 mb-6">
         <h2 className="text-2xl font-bold text-white">Generated Images</h2>
         <button
           onClick={handleDownloadAll}
-          className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500 hover:shadow-purple-500/20"
         >
           <DownloadIcon />
           <span>Download All ({images.length})</span>
         </button>
       </div>
+      
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {images.map((image, index) => (
-          <div key={index} className="group relative rounded-lg overflow-hidden shadow-lg bg-gray-800 aspect-square border border-gray-700">
+          <div key={index} className="group relative rounded-lg overflow-hidden shadow-lg bg-gray-800 aspect-square border border-gray-700 hover:border-purple-500/50 transition-colors">
             <img src={image.src} alt={`Generated mockup: ${image.name}`} className="w-full h-full object-contain" />
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4">
+            
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4 backdrop-blur-sm">
               <button
                 onClick={() => setPreviewImage(image)}
                 title="Preview"
-                className="bg-white text-gray-800 p-3 rounded-full shadow-lg hover:bg-gray-100 transform hover:scale-110 transition-transform"
+                className="bg-white text-gray-900 p-3 rounded-full shadow-lg hover:bg-gray-200 transform hover:scale-110 transition-transform duration-200"
               >
                  <PreviewIcon />
               </button>
@@ -83,10 +85,14 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
                 href={image.src}
                 download={image.name}
                 title="Download"
-                className="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-500 transform hover:scale-110 transition-transform"
+                className="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-500 transform hover:scale-110 transition-transform duration-200"
               >
                 <DownloadIcon />
               </a>
+            </div>
+            
+            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/90 to-transparent text-white text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                {image.name}
             </div>
           </div>
         ))}
@@ -95,11 +101,11 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
       {/* Lightbox / Preview Modal */}
       {previewImage && (
           <div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 transition-opacity duration-300 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 transition-opacity duration-300 backdrop-blur-md"
             onClick={() => setPreviewImage(null)}
           >
               <button 
-                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-50 bg-black/50 rounded-full p-2"
+                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-50 bg-black/50 rounded-full p-2 hover:bg-black/80"
                 onClick={(e) => {
                     e.stopPropagation();
                     setPreviewImage(null);
@@ -107,17 +113,28 @@ export const PodImageGrid: React.FC<ImageGridProps> = ({ images }) => {
               >
                   <CloseIcon />
               </button>
+              
               <div 
-                className="relative max-w-full max-h-full overflow-hidden rounded-lg shadow-2xl flex flex-col items-center"
+                className="relative w-full h-full flex flex-col items-center justify-center"
                 onClick={(e) => e.stopPropagation()}
               >
                   <img 
                     src={previewImage.src} 
                     alt={previewImage.name} 
-                    className="max-w-full max-h-[85vh] object-contain" 
+                    className="max-w-full max-h-[85vh] object-contain shadow-2xl rounded-lg" 
                   />
-                  <div className="mt-4 text-white text-lg font-medium px-4 py-2 bg-black/60 rounded-full">
+                  <div className="mt-4 text-white text-lg font-medium px-6 py-2 bg-black/70 rounded-full border border-gray-700">
                       {previewImage.name}
+                  </div>
+                  
+                  <div className="mt-4 flex gap-4">
+                     <a
+                        href={previewImage.src}
+                        download={previewImage.name}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-full font-medium transition-colors flex items-center gap-2"
+                      >
+                        <DownloadIcon /> Download
+                      </a>
                   </div>
               </div>
           </div>
