@@ -28,12 +28,23 @@ const pool = new Pool({
 // Init DB Tables
 const initDb = async () => {
   try {
-    // Stats Table
+    // Old Stats Table (kept for backup, but we will use the new one)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usage_stats (
         feature_name VARCHAR(50) PRIMARY KEY,
         usage_count INT DEFAULT 0,
         last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // NEW Stats Table: Tracks per User + Feature
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_feature_stats (
+        username VARCHAR(255),
+        feature_name VARCHAR(50),
+        usage_count INT DEFAULT 0,
+        last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (username, feature_name)
       );
     `);
     
@@ -452,11 +463,32 @@ app.post(['/stats/track', '/api/stats/track'], authenticateToken, async (req, re
   const { feature } = req.body;
   if (!feature) return res.status(400).json({ error: 'Feature name required' });
   
+  const username = req.user.username || 'unknown';
+
   try {
-    console.log(`Tracking usage for feature: ${feature} by user: ${req.user.username}`);
+    console.log(`Tracking usage for feature: ${feature} by user: ${username}`);
     
-    // Check table existence explicitly to avoid "relation does not exist" errors
-    // (Backup safety in case initDb failed silently or was race-conditioned)
+    // Ensure table exists (User specific stats)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_feature_stats (
+        username VARCHAR(255),
+        feature_name VARCHAR(50),
+        usage_count INT DEFAULT 0,
+        last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (username, feature_name)
+      );
+    `);
+
+    // Insert or Update the User+Feature specific stat
+    const query = `
+      INSERT INTO user_feature_stats (username, feature_name, usage_count, last_used_at)
+      VALUES ($1, $2, 1, NOW())
+      ON CONFLICT (username, feature_name)
+      DO UPDATE SET usage_count = user_feature_stats.usage_count + 1, last_used_at = NOW();
+    `;
+    await pool.query(query, [username, feature]);
+    
+    // Also update global stats for backward compatibility (optional but good)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usage_stats (
         feature_name VARCHAR(50) PRIMARY KEY,
@@ -464,14 +496,13 @@ app.post(['/stats/track', '/api/stats/track'], authenticateToken, async (req, re
         last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-
-    const query = `
+    await pool.query(`
       INSERT INTO usage_stats (feature_name, usage_count, last_used_at)
       VALUES ($1, 1, NOW())
       ON CONFLICT (feature_name)
       DO UPDATE SET usage_count = usage_stats.usage_count + 1, last_used_at = NOW();
-    `;
-    await pool.query(query, [feature]);
+    `, [feature]);
+
     res.status(200).json({ message: 'Tracked successfully' });
   } catch (e) { 
     console.error("Stats tracking error:", e);
@@ -481,7 +512,8 @@ app.post(['/stats/track', '/api/stats/track'], authenticateToken, async (req, re
 
 app.get(['/stats', '/api/stats'], authenticateToken, isAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM usage_stats ORDER BY usage_count DESC');
+    // Return the detailed user stats
+    const result = await pool.query('SELECT * FROM user_feature_stats ORDER BY last_used_at DESC');
     res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

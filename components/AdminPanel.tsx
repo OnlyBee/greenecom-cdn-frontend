@@ -166,28 +166,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
         </div>
 
         {/* --- USAGE STATISTICS DASHBOARD --- */}
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-700 w-full md:w-auto min-w-[320px] shadow-inner">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-700 w-full md:w-auto min-w-[400px] shadow-inner">
             <div className="flex justify-between items-center mb-3">
                 <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wide flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
-                    AI Usage Stats
+                    Usage Stats (User / Feature)
                 </h3>
                 <button onClick={fetchStats} className="text-gray-400 hover:text-white p-1.5 rounded-full hover:bg-gray-800 transition-colors" title="Refresh Stats">
                     <RefreshIcon spinning={statsLoading} />
                 </button>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[250px] custom-scrollbar">
                 <table className="w-full text-sm text-left text-gray-300">
-                    <thead className="text-xs text-gray-500 uppercase bg-gray-800/50">
+                    <thead className="text-xs text-gray-500 uppercase bg-gray-800/50 sticky top-0 backdrop-blur-sm">
                         <tr>
-                            <th className="px-3 py-2 rounded-l-md">Feature</th>
+                            <th className="px-3 py-2 rounded-l-md">User</th>
+                            <th className="px-3 py-2">Feature</th>
                             <th className="px-3 py-2 text-right">Runs</th>
                             <th className="px-3 py-2 text-right rounded-r-md">Last Used</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800">
-                        {stats.length > 0 ? stats.map(stat => (
-                            <tr key={stat.feature_name} className="hover:bg-gray-800/30 transition-colors">
+                        {stats.length > 0 ? stats.map((stat, idx) => (
+                            <tr key={`${stat.username}-${stat.feature_name}-${idx}`} className="hover:bg-gray-800/30 transition-colors">
+                                <td className="px-3 py-2 font-bold text-blue-300">{stat.username || 'Unknown'}</td>
                                 <td className="px-3 py-2 font-medium text-white capitalize">{stat.feature_name}</td>
                                 <td className="px-3 py-2 text-right font-bold text-green-400">{stat.usage_count}</td>
                                 <td className="px-3 py-2 text-right text-xs text-gray-500 font-mono">
@@ -196,7 +198,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={3} className="px-3 py-4 text-center text-gray-500 italic text-xs">
+                                <td colSpan={4} className="px-3 py-4 text-center text-gray-500 italic text-xs">
                                     No usage data yet. <br/> Generate some images!
                                 </td>
                             </tr>
