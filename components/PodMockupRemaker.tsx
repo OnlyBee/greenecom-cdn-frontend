@@ -46,8 +46,10 @@ export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ apiKey, onApiEr
     setError(null);
     setGeneratedImages([]);
 
-    // TRACK USAGE IMMEDIATELY (Before waiting for AI)
-    api.trackUsage('mockup').catch(e => console.error('Tracking failed', e));
+    // TRACK USAGE
+    api.trackUsage('mockup')
+        .then(() => console.log('Mockup stats tracked successfully'))
+        .catch(e => console.error('Tracking failed', e));
 
     try {
       // Pass apiKey and isDoubleSided

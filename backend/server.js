@@ -45,7 +45,7 @@ const initDb = async () => {
       );
     `);
     
-    console.log("DB Tables initialized");
+    console.log("DB Tables initialized successfully");
   } catch (err) {
     console.error("Error initializing DB:", err);
   }
@@ -451,7 +451,20 @@ app.delete(['/images/:id', '/api/images/:id'], authenticateToken, async (req, re
 app.post(['/stats/track', '/api/stats/track'], authenticateToken, async (req, res) => {
   const { feature } = req.body;
   if (!feature) return res.status(400).json({ error: 'Feature name required' });
+  
   try {
+    console.log(`Tracking usage for feature: ${feature} by user: ${req.user.username}`);
+    
+    // Check table existence explicitly to avoid "relation does not exist" errors
+    // (Backup safety in case initDb failed silently or was race-conditioned)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usage_stats (
+        feature_name VARCHAR(50) PRIMARY KEY,
+        usage_count INT DEFAULT 0,
+        last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     const query = `
       INSERT INTO usage_stats (feature_name, usage_count, last_used_at)
       VALUES ($1, 1, NOW())
@@ -459,8 +472,11 @@ app.post(['/stats/track', '/api/stats/track'], authenticateToken, async (req, re
       DO UPDATE SET usage_count = usage_stats.usage_count + 1, last_used_at = NOW();
     `;
     await pool.query(query, [feature]);
-    res.status(200).json({ message: 'Tracked' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    res.status(200).json({ message: 'Tracked successfully' });
+  } catch (e) { 
+    console.error("Stats tracking error:", e);
+    res.status(500).json({ error: e.message }); 
+  }
 });
 
 app.get(['/stats', '/api/stats'], authenticateToken, isAdmin, async (req, res) => {

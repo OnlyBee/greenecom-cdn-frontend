@@ -49,8 +49,10 @@ export const PodVariationGenerator: React.FC<VariationGeneratorProps> = ({ apiKe
     setError(null);
     setGeneratedImages([]);
 
-    // TRACK USAGE IMMEDIATELY (Before waiting for AI)
-    api.trackUsage('variation').catch(e => console.error('Tracking failed', e));
+    // TRACK USAGE
+    api.trackUsage('variation')
+        .then(() => console.log('Variation stats tracked successfully'))
+        .catch(e => console.error('Tracking failed', e));
 
     try {
       const images = await generateVariations(apiKey, selectedFile, selectedColors);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { User, Folder, UsageStat } from '../types';
 import { api } from '../services/api';
 import Modal from './Modal';
@@ -15,8 +15,8 @@ const TrashIcon = () => (
     </svg>
 );
 
-const RefreshIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const RefreshIcon = ({ spinning }: { spinning: boolean }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${spinning ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
     </svg>
 );
@@ -33,21 +33,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   
   const [loading, setLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [stats, setStats] = useState<UsageStat[]>([]);
   
-  const fetchStats = () => {
-    api.getUsageStats()
-      .then(data => {
-          if (data) setStats(data);
-      })
-      .catch(err => console.error("Failed to fetch stats", err));
-  };
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const data = await api.getUsageStats();
+      if (data) setStats(data);
+    } catch (err) {
+      console.error("Failed to fetch stats", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchStats();
-  }, []);
+    // Auto-refresh stats every 10 seconds
+    const interval = setInterval(fetchStats, 10000);
+    return () => clearInterval(interval);
+  }, [fetchStats]);
 
   const handleCreateUser = async () => {
     if (!newUsername || !newPassword) {
@@ -165,7 +173,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ users, folders, onUpdate }) => 
                     AI Usage Stats
                 </h3>
                 <button onClick={fetchStats} className="text-gray-400 hover:text-white p-1.5 rounded-full hover:bg-gray-800 transition-colors" title="Refresh Stats">
-                    <RefreshIcon/>
+                    <RefreshIcon spinning={statsLoading} />
                 </button>
             </div>
             <div className="overflow-x-auto">
