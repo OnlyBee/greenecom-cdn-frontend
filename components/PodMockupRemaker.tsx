@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { PodImageUploader } from './PodImageUploader';
 import { PodImageGrid } from './PodImageGrid';
@@ -46,12 +45,14 @@ export const PodMockupRemaker: React.FC<MockupRemakerProps> = ({ apiKey, onApiEr
     setIsLoading(true);
     setError(null);
     setGeneratedImages([]);
+
+    // TRACK USAGE IMMEDIATELY (Before waiting for AI)
+    api.trackUsage('mockup').catch(e => console.error('Tracking failed', e));
+
     try {
       // Pass apiKey and isDoubleSided
       const images = await remakeMockups(apiKey, selectedFile, selectedApparelTypes, isDoubleSided);
       setGeneratedImages(images);
-
-      api.trackUsage('mockup').catch(e => console.error('Tracking failed', e));
 
     } catch (err: any) {
       console.error(err);

@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import type { GeneratedImage, Color, ApparelType } from "../podTypes";
 
@@ -38,7 +37,7 @@ const generateImage = async (apiKey: string, imagePart: any, prompt: string, asp
         config: {
             systemInstruction: systemInstruction,
             imageConfig: {
-                aspectRatio: aspectRatio,
+                aspectRatio: "1:1", // Strict 1:1 as requested
                 imageSize: "1K"
             }
         }
@@ -139,7 +138,7 @@ export const remakeMockups = async (apiKey: string, file: File, apparelTypes: Ap
             modelPrompt = `${basePrompt} ${apparelInstruction}
             SCENE: High-end Lifestyle Portrait.
             SUBJECT: A model wearing the ${typeStr}, facing forward.
-            FRAMING: Medium shot (Waist up). Zoom in enough to make the text design clear and readable.
+            FRAMING: Medium shot (waist up). Zoom in enough to make the text design clear and readable.
             CONSTRAINT: ONE person only. Front view only.
             Lighting: Soft studio lighting.`;
 
