@@ -23,9 +23,12 @@ const generateImage = async (apiKey: string, imagePart: any, prompt: string, asp
     const ai = new GoogleGenAI({ apiKey });
     
     // System instruction to ensure text fidelity
-    const systemInstruction = `You are a professional product photographer. 
-    Your Highest Priority: PRESERVE THE GRAPHIC DESIGN TEXT AND ARTWORK 100%. 
-    Do not misspell, blur, or alter the design on the shirt.`;
+    const systemInstruction = `You are a professional product photographer and image editor.
+    CRITICAL INSTRUCTION: TEXT FIDELITY IS PARAMOUNT.
+    1. When applying a graphic design to a new shirt, you MUST preserve the original text spelling, font, and style EXACTLY.
+    2. Do NOT redraw the text. Treat the design as a "texture" that is mapped onto the 3D surface of the cloth.
+    3. Do NOT hallucinate new text or change the wording.
+    4. If the text is small, ensure it remains sharp and readable.`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-3-pro-image-preview',
@@ -58,9 +61,10 @@ const generateImage = async (apiKey: string, imagePart: any, prompt: string, asp
 export const generateVariations = async (apiKey: string, file: File, selectedColors: Color[]): Promise<GeneratedImage[]> => {
   const imagePart = await fileToGenerativePart(file);
   const promises = selectedColors.map(async (color) => {
-    const prompt = `Professional product photography. Change the color of the T-shirt/apparel to '${color.name}'. 
-    CRITICAL: Keep the printed graphic design and text EXACTLY the same as the original image. 
-    Do not change the background. High resolution, realistic texture.`;
+    const prompt = `Change the color of the apparel to '${color.name}'. 
+    CRITICAL: The printed graphic design and text must remain IDENTICAL to the source image. 
+    Do not alter the font, spelling, or position of the design.
+    Keep the original background and lighting.`;
     const src = await generateImage(apiKey, imagePart, prompt, "1:1");
     return { src, name: `${color.name}.png` };
   });
@@ -89,11 +93,16 @@ export const remakeMockups = async (apiKey: string, file: File, apparelTypes: Ap
     const createMockupPromises = (apparelType: ApparelType | null): Promise<GeneratedImage>[] => {
         // Core instruction: Extract design, discard old scene.
         const basePrompt = `You are an expert product photographer. 
-        TASK: Extract the GRAPHIC DESIGN/ARTWORK from the source image and apply it to a BRAND NEW apparel mockup.
-        CRITICAL: 
-        1. Do NOT use the original background. Create a completely NEW environment.
-        2. Do NOT use the original person/model. Use a NEW model or NEW pose.
-        3. Keep the graphic design exactly as is (colors, details), but realistic lighting must apply to it.`;
+        TASK: Take the GRAPHIC DESIGN/PRINT from the source image and composite it onto a NEW ${apparelType || "apparel"} mockup.
+        
+        STRICT RULES FOR TEXT:
+        - The text in the design MUST remain legible and spelled correctly.
+        - Treat the design as a static asset being projected onto the cloth.
+        - Do NOT try to "improve" the text. Copy it exactly.
+        
+        ENVIRONMENTS:
+        - Create a completely NEW, photorealistic environment.
+        - Realistic fabric folds, lighting, and shadows must apply OVER the design.`;
 
         const typeStr = apparelType || "apparel";
         const apparelInstruction = `The item is a ${typeStr}.`;
@@ -103,60 +112,44 @@ export const remakeMockups = async (apiKey: string, file: File, apparelTypes: Ap
 
         let modelPrompt = "";
         let flatLayPrompt = "";
-        // Use 4:3 for split screen, 1:1 for single
-        const aspectRatio = isDoubleSided ? "4:3" : "1:1"; 
+        
+        // Forced 1:1 aspect ratio for all modes as requested
+        const aspectRatio = "1:1";
 
         if (isDoubleSided) {
              // 1. Model Prompt: Front & Back View (Composited)
             modelPrompt = `${basePrompt} ${apparelInstruction}
-            SCENE: A lifestyle fashion shot.
-            SUBJECT: Generate a composite image showing TWO angles of a model wearing this ${typeStr}.
-            - Figure A (Front): A model facing forward, clearly displaying the design on the FRONT.
-            - Figure B (Back): The SAME model standing turned around (back to camera) to show the BACK of the item.
-            COMPOSITION: 
-            - The two figures should stand close together, slightly overlapping (e.g., back-to-back or one slightly behind the other).
-            - Zoom in to frame them from mid-thigh up.
-            - FOCUS: The Graphic Design must be large, readable, and the center of attention.
-            - Lighting: Professional studio or natural outdoor lighting.`;
+            SCENE: Split-screen or Composite Lifestyle Shot.
+            SUBJECT: Show the SAME model in two poses side-by-side (or composited creatively).
+            - Left/Front: Model facing forward showing the Front Design.
+            - Right/Back: Model turning away showing the Back.
+            CONSTRAINT: Ensure the graphic design text is perfectly readable.
+            Lighting: Bright, natural, high-key lighting.`;
             
             // 2. Flat-lay Prompt: Front & Back View (Laid out)
             flatLayPrompt = `${basePrompt} ${apparelInstruction}
-            SCENE: A professional flat-lay photography on a specific surface (e.g., wooden table, concrete, or marble).
-            SUBJECT: Arrange TWO ${typeStr}s on the surface.
-            - Item 1: Unfolded or neatly arranged showing the FRONT design.
-            - Item 2: Folded or laid next to Item 1, showing the BACK of the apparel.
-            COMPOSITION:
-            - Place them close together to fill the frame.
-            - Do not zoom out too far; crop tightly around the shirts so the Design is very clear and detailed.
-            DECORATION: Stylize the scene with ${randomProps} placed naturally around (but not covering the design).`;
+            SCENE: Professional Flat Lay on a neutral texture (wood/concrete).
+            SUBJECT: Two items arranged aesthetically.
+            1. One ${typeStr} unfolded showing the Front.
+            2. One ${typeStr} folded or placed adjacent showing the Back.
+            DECORATION: Add minimal props: ${randomProps}.
+            CONSTRAINT: The text on the design must be sharp.`;
         } else {
-            // 1. Model Prompt: Single View (STRICTLY ONE)
-            // Reinforced constraints to prevent back view or multiple people
+            // 1. Model Prompt: Single View
             modelPrompt = `${basePrompt} ${apparelInstruction}
-            SCENE: A high-quality lifestyle fashion shot.
-            SUBJECT: A SINGLE model wearing this ${typeStr}.
-            CONSTRAINT: 
-            - There must be ONLY ONE person in the image.
-            - VIEW: Frontal view ONLY. The model is facing the camera.
-            - NO mirrors, NO split screens, NO back views.
-            POSE: The model is relaxed, chest visible clearly.
-            COMPOSITION:
-            - Medium shot (waist up).
-            - The Graphic Design must be the absolute hero of the image. Clear, sharp, and well-lit.
-            - Lighting: Soft, natural daylight.`;
+            SCENE: High-end Lifestyle Portrait.
+            SUBJECT: A model wearing the ${typeStr}, facing forward.
+            FRAMING: Medium shot (Waist up). Zoom in enough to make the text design clear and readable.
+            CONSTRAINT: ONE person only. Front view only.
+            Lighting: Soft studio lighting.`;
 
-            // 2. Flat-lay Prompt: Single View (STRICTLY ONE)
-            // Reinforced constraints to prevent second folded shirt
+            // 2. Flat-lay Prompt: Single View
             flatLayPrompt = `${basePrompt} ${apparelInstruction}
-            SCENE: A professional flat-lay photography.
-            SUBJECT: EXACTLY ONE ${typeStr} (Solo object).
-            ARRANGEMENT: 
-            - The item is placed in the center.
-            - It is either unfolded OR neatly folded (but only ONE item total).
-            - VIEW: Front view ONLY.
-            - FORBIDDEN: Do NOT place a second shirt. Do NOT place a folded version next to it.
-            DECORATION: Stylize the scene with ${randomProps} placed artistically around the item.
-            FOCUS: Ensure the design is not covered by props.`;
+            SCENE: Clean Minimalist Flat Lay.
+            SUBJECT: A single ${typeStr} placed in the center.
+            ARRANGEMENT: Neatly folded or flat.
+            DECORATION: ${randomProps} placed around the edges.
+            CONSTRAINT: ONE item only. Front view only.`;
         }
         
         const nameSuffix = apparelType ? `_${apparelType.toLowerCase().replace(/\s/g, '_')}` : '';
@@ -171,10 +164,8 @@ export const remakeMockups = async (apiKey: string, file: File, apparelTypes: Ap
     let allPromises: Promise<GeneratedImage>[] = [];
 
     if (apparelTypes.length === 0) {
-        // Default behavior: auto-detect if no types are selected
         allPromises = createMockupPromises(null);
     } else {
-        // Generate for each selected type
         apparelTypes.forEach(type => {
             allPromises.push(...createMockupPromises(type));
         });
